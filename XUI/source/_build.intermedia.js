@@ -10498,6 +10498,8 @@ function Exception(err, des) {
 })();
 
 
+;
+
 $CLASS('XUIObject', function(){
 
 	$PUBLIC({
@@ -10671,14 +10673,35 @@ $CLASS('UI.Pt', function(){
 
 
 });
-$CLASS('ResourceMgr', function(){
+;
 
-	$PUBLIC({
-		'addSearchPath' : addSearchPath,
-		'getResourcePath' : getResourcePath
+(function(){
+
+	$CLASS('UI.ResourceMgr', function(){
+		$PUBLIC({
+			'addSearchPath' : addSearchPath,
+			'getResourcePath' : getResourcePath
+		});
+	})
+	.$STATIC({
+		'instance' : resourceMgrInstance
 	});
 
-});
+
+	var resource_mgr_instance;
+	function resourceMgrInstance() 
+	{
+		if (!resource_mgr_instance)
+			resource_mgr_instance = new UI.ResourceMgr();
+
+		return resource_mgr_instance;
+	}
+
+})();
+
+
+
+
 ;
 
 $CLASS('UI.IXDraw', function(){

@@ -1,3 +1,5 @@
+;
+
 $CLASS('XUIObject', function(){
 
 	$PUBLIC({
