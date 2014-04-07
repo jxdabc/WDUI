@@ -10623,7 +10623,17 @@ $CLASS('UI.Rect', function(){
 		'left' : 0,
 		'top' : 0,
 		'right' : 0,
-		'bottom' : 0
+		'bottom' : 0,
+
+		'width' : width,
+		'height' : height,
+		'area' : area,
+
+		'equal' : equal,
+
+		'intersect' : intersect,
+
+		'offset' : offset
 	});
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
@@ -10644,12 +10654,63 @@ $CLASS('UI.Rect', function(){
 			return;
 		}
 
+		if (left.instanceOf && left.instanceOf(UI.Rect))
+		{
+			var rc = left;
+			this.left = rc.left;
+			this.top = rc.top;
+			this.right = rc.right;
+			this.bottom = rc.bottom;
+
+			return;
+		}
+
 		this.left = left;
 		this.top = top;
 		this.right = right;
 		this.bottom = bottom;
 	});
 
+	function width () { return this.right - this.left; }
+	function height () { return this.bottom - this.top; }
+	function equal (rc) {
+		return this.top == rc.top &&
+			this.bottom == rc.bottom &&
+			this.left == rc.left &&
+			this.right == rc.right;
+	}
+	function intersect (rc) {
+		var new_rect = new UI.Rect();
+
+		do 
+		{
+			new_rect.top = Math.max(this.top, rc.top);
+			new_rect.bottom = Math.min(this.bottom, rc.bottom);
+			if (new_rect.top > new_rect.bottom) break;
+
+			new_rect.left = Math.max(this.left, rc.left);
+			new_rect.right = Math.min(this.right, rc.right);
+			if (new_rect.left > new_rect.right) break;
+
+			return new_rect;
+
+		} while (false);
+
+		return new UI.Rect();	
+	}
+	function area () {
+		return (this.bottom - this.top) * (this.right - this.left);
+	}
+	function isEmpty() {
+		return this.bottom <= this.top || this.right <= this.left;
+	}
+
+	function offset(x, y) {
+		this.left += x;
+		this.top += y;
+		this.right += x;
+		this.bottom += y;
+	}
 
 });
 ;
@@ -10678,23 +10739,93 @@ $CLASS('UI.Pt', function(){
 (function(){
 
 	$CLASS('UI.ResourceMgr', function(){
+
+	
 		$PUBLIC({
 			'addSearchPath' : addSearchPath,
 			'getResourcePath' : getResourcePath
 		});
+
+		$CONSTRUCTOR(function(){
+			addSearchPath('default_skin_package');
+		});
+
+		var m_search_path = [];
+
+		function addSearchPath(path) {
+			path = trimLastSlash(path);
+			for (var i = 0; i < m_search_path.length; i++)
+				if (m_search_path[i] == path)
+					return;
+			m_search_path.push(path);
+		}
+
+		function getResourcePath(path, callback) {
+
+			// callback(path)
+
+			var requests = [];
+			for (var i = 0; i < m_search_path.length; i++) {
+				var info = {};
+				info.file = m_search_path[i] + '/' + path;
+				info.XHR = $.ajax({
+					'url' : info.file,
+					'method' : 'HEAD'
+				})
+				.done(function(p,q,XHR){ onRequestDone(XHR.index, true) })
+				.fail(function(XHR){ onRequestDone(XHR.index, false) });
+				info.XHR.index = requests.length;
+				requests.push(info);
+			}
+
+			function onRequestDone(index, is_found) {
+
+				if (index === null) return;
+
+				var info = requests[index];
+				info.done = true;
+				info.found = is_found;
+				for (var i = 0; i < requests.length; i++)
+					if (!requests[i].done || requests[i].found)
+						break;
+				if (i >= requests.length)
+					callback('');
+				else if (requests[i].done) {
+					callback(requests[i].file);
+					for (var i = 0; i < requests.length; i++) {
+						var XHR = requests[i].XHR;
+						XHR.index = null;
+						XHR.abort();
+					}		
+				}
+			}
+
+		}
+
+		function trimLastSlash(path) {
+			if (path.substr(path.length - 1) == '/')
+				return path.substr(0, path.length -1);
+			return path;
+		}
+
 	})
 	.$STATIC({
-		'instance' : resourceMgrInstance
+		'instance' : resourceMgrInstance,
+		'getImage' : getImage
 	});
 
 
 	var resource_mgr_instance;
-	function resourceMgrInstance() 
-	{
+	function resourceMgrInstance() {
 		if (!resource_mgr_instance)
 			resource_mgr_instance = new UI.ResourceMgr();
 
 		return resource_mgr_instance;
+	}
+
+	function getImage(relative_path) {
+		var img = new XImageWeb();
+		return img.load('@' + relative_path);
 	}
 
 })();
@@ -10737,7 +10868,7 @@ function(){
 		'setPartRect'    : $ABSTRACT,
 		'getImageHeight' : $ABSTRACT,
 		'getImageWidth'  : $ABSTRACT,
-		'onChange'		 : $ABSTRACT
+		'onLoad'		 : $ABSTRACT
 	});
 });
 
@@ -10756,3 +10887,325 @@ $CLASS('UI.IXImage.DrawType', function(){})
 
 ;
 
+$CLASS('UI.XImageCanvasImage', 
+$EXTENDS(UI.IXImage),
+function(){
+
+	var m_img;
+	var m_buffer;
+
+	var m_draw_type = 
+		UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
+	var m_formatted_img;
+	var m_alpha = 255;
+
+	var m_src_rect = new UI.Rect();
+	var m_dst_rect = new UI.Rect();
+	var m_part_rect = new UI.Rect();
+
+	var m_loaded = false;
+
+
+	$PUBLIC({
+		'load' : load,
+
+		'setSrcRect'  : setSrcRect,
+		'setDstRect'  : setDstRect,
+		'setDrawType' : setDrawType,
+		'setPartRect' : setPartRect,
+		'setAlpha' : setAlpha,
+
+		'getImageWidth' : getImageWidth,
+		'getImageHeight' : getImageHeight,
+
+		'draw' : draw
+	});
+
+	function load(path) {
+		if (path.substr(0, 1) == '@')
+			loadAsResource(path.substr(1));
+		else 
+			loadImageObject(path);
+	}
+
+	function loadAsResource(path) { 
+		var mgr = new UI.ResourceMgr.$S('instance')();
+		mgr.getResourcePath(path, function(real_path){
+			load(real_path); 
+		});
+	}
+	
+	function loadImageObject(path) {
+		m_loaded = false;
+
+		m_img = new Image();
+		$(m_img).on('load', onImgLoaded);
+		
+		m_img.src = path;
+	}
+
+	function onImgLoaded() {
+
+		m_loaded = true;
+
+		m_img = new UI.XCanvasImage(m_img);
+
+		releaseBuffer();
+
+		loadFormattedImageInfo();
+
+		initSrcRect();
+	}
+
+
+	function releaseBuffer() {
+		m_buffer = null;
+	}
+
+	function refreshBuffer() {
+		releaseBuffer();
+
+		m_buffer = document.createElement('canvas');
+		m_buffer.width = m_dst_rect.width;
+		m_buffer.height = m_dst_rect.height;
+
+		switch (m_draw_type)
+		{
+			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL'): 
+				drawNormal(m_buffer.getContext('2d')); 
+				break;
+			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH'):  
+				drawStretch(m_buffer.getContext('2d')); 
+				break;
+			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART'): 
+				draw9Part(m_buffer.getContext('2d')); 
+				break;
+			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_3PARTH'): 
+				draw3PartH(m_buffer.getContext('2d')); 
+				break;
+			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_3PARTV'): 
+				draw3PartV(m_buffer.getContext('2d')); 
+				break;
+		}
+	}
+
+	function loadFormattedImageInfo() {
+		m_formatted_img = true;
+		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
+			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
+		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
+			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH');
+		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
+			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART');
+			loadFormattedImagePartInfo();
+			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
+		}
+		else
+			m_formatted_img = false;
+	}
+
+	function loadFormattedImagePartInfo() {
+		var data = m_img.getImageData();
+		data = data.data;
+
+		// 9-part images have 1-pixel borders on each side.
+		var img_real_width = m_img.getWidth() - 2;
+		var img_real_height = m_img.getHeight() - 2;
+
+		// X
+		for (var i = 0; i < img_real_width; i++)
+			if (getRGBA(data, i + 1, 0, m_img.getWidth()) == 0x000000FF) {
+				m_part_rect.left = i;
+				break;
+			}
+		if (i >= img_real_width) {
+			m_part_rect.left = 0;
+			m_part_rect.right = img_real_width;
+		} else {
+			for (i++; i < img_real_width; i++)
+				if (getRGBA(data, i + 1, 0, m_img.getWidth()) != 0x000000FF) {
+					m_part_rect.right = i;
+					break;
+				}
+
+			if (i >= img_real_width)
+				m_part_rect.right = img_real_width;
+		}
+
+		// Y
+		for (var j = 0; j < img_real_height; j++)
+		{
+			if (getRGBA(data, 0, j + 1, m_img.getWidth()) == 0x000000FF) {
+				m_part_rect.top = j;
+				break;
+			}
+		}
+		if (j >= img_real_height) {
+			m_part_rect.top = 0;
+			m_part_rect.bottom = img_real_height;
+		} else {
+			for (j++; j < img_real_height; j++)
+				if (getRGBA(data, 0, j + 1, m_img.getWidth()) != 0x000000FF) {
+					m_part_rect.bottom = j;
+					break;
+				}
+
+			if (j >= img_real_height)
+				m_part_rect.bottom = img_real_height;
+		}
+	}
+
+	function initSrcRect() {
+		m_src_rect.left = m_src_rect.top = 0;
+		m_src_rect.right = m_img.getWidth();
+		m_src_rect.bottom = m_img.getHeight();
+	}
+
+	function getRGBA(data, x, y, img_width)
+	{
+		var r,g,b,a;
+		var base = (y * img_width + x) * 4;
+		r = data[base], g = data[base + 1], b = data[base + 2], a = data[base + 3];
+		return r << 24 | g << 16 | b << 8 | a;
+	}
+
+	function getImageWidth() {
+		return m_img.getWidth();
+	}
+
+	function getImageHeight() {
+		return m_img.getHeight();
+	}
+
+	function setSrcRect(rc) {
+		if (m_src_rect.equal(rc))
+			return;
+
+		releaseBuffer();
+		m_src_rect = rc;
+	}
+
+	function setDstRect(rc) {
+		if (m_dst_rect.equal(rc))
+			return;
+
+		releaseBuffer();
+		m_dst_rect = rc;
+	}
+
+	function setDrawType(type) {
+
+		if (m_draw_type == type)
+			return;
+
+		releaseBuffer();
+		m_draw_type = type;
+	} 
+
+	function setPartRect(rc) {
+
+		if (m_part_rect.equal(rc))
+			return;
+
+		releaseBuffer();
+		m_part_rect = rc;
+	}
+
+	function setAlpha(alpha) {
+		m_alpha = alpha;
+	}
+
+	function draw(ctx, rect_to_draw) {
+		
+		if (!m_loaded) return;
+
+		if (!m_buffer) refreshBuffer();
+
+		var dst_to_draw_real =
+			rect_to_draw.intersect(m_dst_rect);
+
+		if (dst_to_draw_real.isEmpty()) return;
+
+		var src_to_draw_real = 
+			new UI.Rect(dst_to_draw_real);
+		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
+
+		ctx.save();
+		ctx.globalAlpha = m_alpha;
+		m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		ctx.restore();
+	}
+
+});
+
+$CLASS('UI.XCanvasImage', function(){
+
+
+	var canvas;
+
+	$PUBLIC({
+		'getWidth' : getWidth,
+		'getHeight' : getHeight,
+		
+		'clip' : clip,
+		
+		'draw' : draw,
+		'getCanvas' : getCanvas,
+		'getImageData' : getImageData,
+		
+		'src' : ''
+	});
+
+	$CONSTRUCTOR(function(img_src){
+
+		var width = img_src.width;
+		var height = img_src.height;
+
+		canvas = document.createElement('canvas');
+		canvas.width = width;
+		canvas.height = height;
+
+		var ctx = canvas.getContext('2d');
+		ctx.drawImage(img_src, 0, 0);
+
+		this.src = img_src.src;
+	});
+
+	function clip(x, y, width, height) {
+		
+		var new_canvas = document.createElement('canvas');
+		new_canvas.width = width;
+		new_canvas.height = height;
+
+		var ctx = new_canvas.getContext('2d');
+		ctx.drawImage(canvas, x, y, width, height,
+			0, 0, width, height);
+		canvas = new_canvas;
+	}
+
+	function getWidth() {return canvas.width;}
+	function getHeight() {return canvas.height;}
+
+
+	function getCanvas() {
+		return canvas;
+	}
+
+	function getImageData() {
+		return canvas
+			.getContext('2d')
+			.getImageData(0, 0, canvas.width, canvas.height);
+	}
+
+	function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
+		if (sx.instanceOf && sx.instanceOf(UI.Rect)) {
+			var src = sx, drc = sy;
+			draw(ctx, 
+				src.left, src.top, src.width(), src.height(),
+				drc.left, drc.top, drc.width(), drc.height());
+		}
+		else
+			ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+	}
+
+});

@@ -33,7 +33,7 @@ function(){
 		'setPartRect'    : $ABSTRACT,
 		'getImageHeight' : $ABSTRACT,
 		'getImageWidth'  : $ABSTRACT,
-		'onChange'		 : $ABSTRACT
+		'onLoad'		 : $ABSTRACT
 	});
 });
 
