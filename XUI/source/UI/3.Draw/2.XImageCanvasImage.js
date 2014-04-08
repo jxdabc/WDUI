@@ -2,7 +2,7 @@
 
 $CLASS('UI.XImageCanvasImage', 
 $EXTENDS(UI.IXImage),
-function(){
+function(me){
 
 	var m_img;
 	var m_buffer;
@@ -18,8 +18,10 @@ function(){
 
 	var m_unloaded_part_rect = null;
 	var m_unloaded_src_rect = null;
+	var m_unloaded_draw_type = null;
 
 	var m_loaded = false;
+	var m_image_loaded_listener = [];
 
 
 	$PUBLIC({
@@ -34,12 +36,18 @@ function(){
 		'getImageWidth' : getImageWidth,
 		'getImageHeight' : getImageHeight,
 
-		'draw' : draw
+		'draw' : draw,
+
+		'onImageLoaded' : onImageLoaded,
+		'offImageLoaded' : offImageLoaded
 	});
 
 	function load(path) {
 
-		m_unloaded_src_rect = m_unloaded_part_rect = null;
+		m_unloaded_src_rect = 
+		m_unloaded_part_rect = 
+		m_unloaded_draw_type =
+		null;
 
 		if (path.substr(0, 1) == '@')
 			loadAsResource(path.substr(1));
@@ -48,13 +56,14 @@ function(){
 	}
 
 	function loadAsResource(path) { 
-		var mgr = new UI.ResourceMgr.$S('instance')();
+		var mgr = UI.ResourceMgr.$S('instance')();
 		mgr.getResourcePath(path, function(real_path){
-			load(real_path); 
+			loadImageObject(real_path); 
 		});
 	}
 	
 	function loadImageObject(path) {
+
 		m_loaded = false;
 
 		m_img = new Image();
@@ -64,18 +73,20 @@ function(){
 	}
 
 	function onImgLoaded() {
-
 		m_loaded = true;
 
 		m_img = new UI.XCanvasImage(m_img);
 
 		releaseBuffer();
 
-		if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
-		else loadFormattedImageInfo();
+		loadFormattedImageInfo();
 
 		if (m_unloaded_src_rect) m_src_rect = m_unloaded_src_rect;
 		else initSrcRect();
+
+		$.each(m_image_loaded_listener, function(i,v){
+			v.call(me);
+		});
 	}
 
 
@@ -87,8 +98,8 @@ function(){
 		releaseBuffer();
 
 		m_buffer = document.createElement('canvas');
-		m_buffer.width = m_dst_rect.width;
-		m_buffer.height = m_dst_rect.height;
+		m_buffer.width = m_dst_rect.width();
+		m_buffer.height = m_dst_rect.height();
 
 		switch (m_draw_type)
 		{
@@ -110,7 +121,93 @@ function(){
 		}
 	}
 
+	function drawNormal(ctx) {
+
+		var width = m_src_rect.width();
+		var height = m_src_rect.height();
+
+		m_img.draw(ctx, 
+		new UI.Rect(m_src_rect.left, m_src_rect.top, width, height),
+		new UI.Rect(0, 0, width, height));
+	}
+
+	function drawStretch(ctx) {
+		m_img.draw(ctx, 
+		new UI.Rect(m_src_rect.left, m_src_rect.top, m_src_rect.width(), m_src_rect.height()),
+		new UI.Rect(0, 0, m_dst_rect.width(), m_dst_rect.height()));
+	}
+
+	function draw9Part(ctx) {
+		var rect_part_raw = new UI.Rect(m_part_rect);
+		rect_part_raw.offset(m_src_rect.leftTop());	
+		var rect_part = rect_part_raw.intersect(m_src_rect);
+		if (rect_part.isEmpty()) 
+			rect_part = new UI.Rect();
+
+		var src_rect_array = 
+		[
+			new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), new UI.Size(rect_part.left - m_src_rect.left, rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(rect_part.left, m_src_rect.top), new UI.Size(rect_part.width(), rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(rect_part.right, m_src_rect.top), new UI.Size(m_src_rect.right - rect_part.right, rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(m_src_rect.left, rect_part.top), new UI.Size(rect_part.left - m_src_rect.left, rect_part.height())),
+			new UI.Rect(new UI.Pt(rect_part.left, rect_part.top), new UI.Size(rect_part.width(), rect_part.height())),
+			new UI.Rect(new UI.Pt(rect_part.right, rect_part.top), new UI.Size(m_src_rect.right - rect_part.right, rect_part.height())),
+			new UI.Rect(new UI.Pt(m_src_rect.left, rect_part.bottom), new UI.Size(rect_part.left - m_src_rect.left, m_src_rect.bottom - rect_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_part.left, rect_part.bottom), new UI.Size(rect_part.width(), m_src_rect.bottom - rect_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_part.right, rect_part.bottom), new UI.Size(m_src_rect.right - rect_part.right, m_src_rect.bottom - rect_part.bottom))
+		];
+
+		var rect_dst_part = new UI.Rect(rect_part.left - m_src_rect.left, rect_part.top - m_src_rect.top, 
+						m_dst_rect.right - (m_src_rect.right - rect_part.right) - m_dst_rect.left, 
+						m_dst_rect.bottom - (m_src_rect.bottom - rect_part.bottom) - m_dst_rect.top);
+
+		var dst_rect_array = 
+		[
+			new UI.Rect(new UI.Pt(0, 0), new UI.Size(rect_dst_part.left, rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, 0), new UI.Size(rect_dst_part.width(), rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, 0), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(0, rect_dst_part.top), new UI.Size(rect_dst_part.left, rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, rect_dst_part.top), new UI.Size(rect_dst_part.width(), rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, rect_dst_part.top), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(0, rect_dst_part.bottom), new UI.Size(rect_dst_part.left, m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, rect_dst_part.bottom), new UI.Size(rect_dst_part.width(), m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, rect_dst_part.bottom), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom))	
+		]
+
+
+		$.each(src_rect_array, function(i,v){
+			var src = v;
+			var dst = dst_rect_array[i];
+
+			if (src.isEmpty() || dst.isEmpty()) return;
+
+			m_img.draw(ctx, src, dst);
+		});
+	}
+
+	function draw3PartH(ctx) {
+
+		if (m_part_rect.top != 0 || m_part_rect.bottom != canvas.height)
+			throw new Exception('UI.XImageCanvasImage::D3PHPW', 
+				'UI.XImageCanvasImage: Drawing 3 part  with a wrong part rect. ');
+		draw9Part(ctx);
+	}
+
+	function draw3PartV(ctx) {
+		if (m_part_rect.left != 0 || m_part_rect.right != canvas.width)
+			throw new Exception('UI.XImageCanvasImage::D3PVPW', 
+				'UI.XImageCanvasImage: Drawing 3 part vertically with a wrong part rect. ');
+		draw9Part(ctx);
+	}
+
+
 	function loadFormattedImageInfo() {
+
+		if (m_unloaded_draw_type) {
+			m_draw_type = m_unloaded_draw_type;
+			return;
+		}
+
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
@@ -118,7 +215,8 @@ function(){
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH');
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART');
-			loadFormattedImagePartInfo();
+			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
+			else loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
 		}
 		else
@@ -191,10 +289,12 @@ function(){
 	}
 
 	function getImageWidth() {
+		if (!m_loaded) return 0;
 		return m_img.getWidth();
 	}
 
 	function getImageHeight() {
+		if (!m_loaded) return 0;
 		return m_img.getHeight();
 	}
 
@@ -221,6 +321,11 @@ function(){
 	}
 
 	function setDrawType(type) {
+
+		if (!m_loaded) {
+			m_unloaded_draw_type = type;
+			return;
+		}
 
 		if (m_draw_type == type)
 			return;
@@ -264,8 +369,21 @@ function(){
 
 		ctx.save();
 		ctx.globalAlpha = m_alpha;
-		m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
 		ctx.restore();
+	}
+
+	function onImageLoaded(fn) {
+		m_image_loaded_listener.push(fn);
+	}
+
+	function offImageLoaded(fn) {
+		var index = m_image_loaded_listener.indexOf(fn);
+		if (index == -1) return;
+		m_image_loaded_listener.splice(index, 1);
 	}
 
 });

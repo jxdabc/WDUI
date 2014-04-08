@@ -1,6 +1,6 @@
 ;
 
-$CLASS('UI.IXDraw', function(){
+$CLASS('UI.IXDraw', function(me){
 
 	$PUBLIC({
 		'draw'       : $ABSTRACT,
@@ -13,7 +13,7 @@ $CLASS('UI.IXDraw', function(){
 
 $CLASS('UI.IXText', 
 $EXTENDS(UI.IXDraw),
-function(){
+function(me){
 	$PUBLIC({
 		'getText' : $ABSTRACT,
 		'measure' : $ABSTRACT
@@ -26,18 +26,18 @@ function(){
 
 $CLASS('UI.IXImage',
 $EXTENDS(UI.IXDraw),
-function(){
+function(me){
 	$PUBLIC({
 		'setSrcRect'     : $ABSTRACT,
 		'setDrawType'    : $ABSTRACT,
 		'setPartRect'    : $ABSTRACT,
 		'getImageHeight' : $ABSTRACT,
 		'getImageWidth'  : $ABSTRACT,
-		'onLoad'		 : $ABSTRACT
+		'onImageLoaded'	 : $ABSTRACT
 	});
 });
 
-$CLASS('UI.IXImage.DrawType', function(){})
+$CLASS('UI.IXImage.DrawType', function(me){})
 .$STATIC({
 	'DIT_UNKNOW' : new UI.IXImage.DrawType(),
 	'DIT_NORMAL' : new UI.IXImage.DrawType(),

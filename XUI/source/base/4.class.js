@@ -42,7 +42,7 @@
 			var my_arguments = arguments;
 
 			object_info_stack.push({});
-			scope();
+			scope(this);
 			var object_info = object_info_stack.pop();
 
 			// Parent construction. 

@@ -1,7 +1,7 @@
 ;
 
 
-$CLASS('UI.Size', function(){
+$CLASS('UI.Size', function(me){
 
 	$PUBLIC({
 		'w' : 0,
@@ -13,8 +13,8 @@ $CLASS('UI.Size', function(){
 		if (typeof w != 'undefined' &&
 			typeof h != 'undefined')
 		{
-			this.w = w;
-			this.h = h;
+			me.w = w;
+			me.h = h;
 		}
 	});
 

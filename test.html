@@ -1,8 +1,19 @@
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
-<canvas width="500" height="500" id="test_canvas">
+<canvas width="800" height="800" id="test_canvas">
 </canvas>
 
 <script type="text/javascript">
-	
+	var canvas = $('#test_canvas')[0];
+	var ctx = canvas.getContext('2d');
+
+	var img = new UI.XImageCanvasImage();
+
+	img.onImageLoaded(function(){
+		this.draw(ctx, new UI.Rect(50,50,750,750))
+	});
+
+	img.load('@bgalpha.9.png');
+	img.setDstRect(new UI.Rect(50,50,750,750));
+	//img.setDrawType(UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL'));
 </script>

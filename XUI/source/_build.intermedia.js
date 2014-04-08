@@ -10350,6 +10350,16 @@ function Exception(err, des) {
 	this.err = err;
 	this.des = des;
 }
+
+String.prototype.format = function()
+{
+    var args = arguments;
+    var count = 0;
+    return this.replace(/%/g,                
+        function(){
+            return args[count++];
+        });
+}
 ;
 
 (function(){
@@ -10394,7 +10404,7 @@ function Exception(err, des) {
 			var my_arguments = arguments;
 
 			object_info_stack.push({});
-			scope();
+			scope(this);
 			var object_info = object_info_stack.pop();
 
 			// Parent construction. 
@@ -10500,7 +10510,7 @@ function Exception(err, des) {
 
 ;
 
-$CLASS('XUIObject', function(){
+$CLASS('XUIObject', function(me){
 
 	$PUBLIC({
 		'toString' : toString,
@@ -10512,11 +10522,11 @@ $CLASS('XUIObject', function(){
 	});
 
 	function toString() {
-		return 'XUIObject: ' + this.classobj.classname;
+		return 'XUIObject: ' + me.classobj.classname;
 	}
 
 	function getClassName() {
-		return this.classobj.classname;
+		return me.classobj.classname;
 	}
 
 	function instanceOf(cls) {
@@ -10529,7 +10539,7 @@ $CLASS('XUIObject', function(){
 		if (typeof cls != "function")
 			return false;
 
-		var c = this.classobj;
+		var c = me.classobj;
 
 		return isCls1DerivedClassOfCls2(c, cls);		
 	}
@@ -10596,7 +10606,7 @@ $CLASS('UI', function(){});
 ;
 
 
-$CLASS('UI.Size', function(){
+$CLASS('UI.Size', function(me){
 
 	$PUBLIC({
 		'w' : 0,
@@ -10608,8 +10618,8 @@ $CLASS('UI.Size', function(){
 		if (typeof w != 'undefined' &&
 			typeof h != 'undefined')
 		{
-			this.w = w;
-			this.h = h;
+			me.w = w;
+			me.h = h;
 		}
 	});
 
@@ -10617,7 +10627,7 @@ $CLASS('UI.Size', function(){
 });
 ;
 
-$CLASS('UI.Rect', function(){
+$CLASS('UI.Rect', function(me){
 
 	$PUBLIC({
 		'left' : 0,
@@ -10625,15 +10635,20 @@ $CLASS('UI.Rect', function(){
 		'right' : 0,
 		'bottom' : 0,
 
-		'width' : width,
-		'height' : height,
-		'area' : area,
+		'width' 		: width,
+		'height' 		: height,
+		'leftTop' 		: leftTop,
+		'rightBottom' 	: rightBottom,
+		'area' 			: area,
+		'isEmpty' 		: isEmpty,
 
-		'equal' : equal,
+		'equal' 		: equal,
 
-		'intersect' : intersect,
+		'intersect' 	: intersect,
 
-		'offset' : offset
+		'offset' 		: offset,
+
+		'toString'      : toString
 	});
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
@@ -10646,10 +10661,10 @@ $CLASS('UI.Rect', function(){
 			var pt = left;
 			var size = top;
 
-			this.left = pt.x;
-			this.top = pt.y;
-			this.right = this.left + size.w;
-			this.bottom = this.top + size.h;
+			me.left = pt.x;
+			me.top = pt.y;
+			me.right = me.left + size.w;
+			me.bottom = me.top + size.h;
 
 			return;
 		}
@@ -10657,39 +10672,39 @@ $CLASS('UI.Rect', function(){
 		if (left.instanceOf && left.instanceOf(UI.Rect))
 		{
 			var rc = left;
-			this.left = rc.left;
-			this.top = rc.top;
-			this.right = rc.right;
-			this.bottom = rc.bottom;
+			me.left = rc.left;
+			me.top = rc.top;
+			me.right = rc.right;
+			me.bottom = rc.bottom;
 
 			return;
 		}
 
-		this.left = left;
-		this.top = top;
-		this.right = right;
-		this.bottom = bottom;
+		me.left = left;
+		me.top = top;
+		me.right = right;
+		me.bottom = bottom;
 	});
 
-	function width () { return this.right - this.left; }
-	function height () { return this.bottom - this.top; }
+	function width () { return me.right - me.left; }
+	function height () { return me.bottom - me.top; }
 	function equal (rc) {
-		return this.top == rc.top &&
-			this.bottom == rc.bottom &&
-			this.left == rc.left &&
-			this.right == rc.right;
+		return me.top == rc.top &&
+			me.bottom == rc.bottom &&
+			me.left == rc.left &&
+			me.right == rc.right;
 	}
 	function intersect (rc) {
 		var new_rect = new UI.Rect();
 
 		do 
 		{
-			new_rect.top = Math.max(this.top, rc.top);
-			new_rect.bottom = Math.min(this.bottom, rc.bottom);
+			new_rect.top = Math.max(me.top, rc.top);
+			new_rect.bottom = Math.min(me.bottom, rc.bottom);
 			if (new_rect.top > new_rect.bottom) break;
 
-			new_rect.left = Math.max(this.left, rc.left);
-			new_rect.right = Math.min(this.right, rc.right);
+			new_rect.left = Math.max(me.left, rc.left);
+			new_rect.right = Math.min(me.right, rc.right);
 			if (new_rect.left > new_rect.right) break;
 
 			return new_rect;
@@ -10699,23 +10714,43 @@ $CLASS('UI.Rect', function(){
 		return new UI.Rect();	
 	}
 	function area () {
-		return (this.bottom - this.top) * (this.right - this.left);
+		return (me.bottom - me.top) * (me.right - me.left);
 	}
 	function isEmpty() {
-		return this.bottom <= this.top || this.right <= this.left;
+		return me.bottom <= me.top || me.right <= me.left;
+	}
+
+	function leftTop() {
+		return new UI.Pt(me.left, me.top);
+	}
+
+	function rightBottom() {
+		return new UI.Pt(me.right, me.bottom);
 	}
 
 	function offset(x, y) {
-		this.left += x;
-		this.top += y;
-		this.right += x;
-		this.bottom += y;
+
+		if (x.instanceOf && x.instanceOf(UI.Pt)) {
+			var pt = x;
+			x = pt.x;
+			y = pt.y;
+		}
+
+		me.left += x;
+		me.top += y;
+		me.right += x;
+		me.bottom += y;
+	}
+
+	function toString() {
+		return "left:%, top:%, right:%, bottom:%"
+			.format(me.left, me.top, me.right, me.bottom);
 	}
 
 });
 ;
 
-$CLASS('UI.Pt', function(){
+$CLASS('UI.Pt', function(me){
 
 	$PUBLIC({
 		'x' : 0,
@@ -10727,8 +10762,8 @@ $CLASS('UI.Pt', function(){
 		if (typeof x != 'undefined' &&
 			typeof y != 'undefined')
 		{
-			this.x = x;
-			this.y = y;
+			me.x = x;
+			me.y = y;
 		}
 	});
 
@@ -10835,7 +10870,7 @@ $CLASS('UI.Pt', function(){
 
 ;
 
-$CLASS('UI.IXDraw', function(){
+$CLASS('UI.IXDraw', function(me){
 
 	$PUBLIC({
 		'draw'       : $ABSTRACT,
@@ -10848,7 +10883,7 @@ $CLASS('UI.IXDraw', function(){
 
 $CLASS('UI.IXText', 
 $EXTENDS(UI.IXDraw),
-function(){
+function(me){
 	$PUBLIC({
 		'getText' : $ABSTRACT,
 		'measure' : $ABSTRACT
@@ -10861,18 +10896,18 @@ function(){
 
 $CLASS('UI.IXImage',
 $EXTENDS(UI.IXDraw),
-function(){
+function(me){
 	$PUBLIC({
 		'setSrcRect'     : $ABSTRACT,
 		'setDrawType'    : $ABSTRACT,
 		'setPartRect'    : $ABSTRACT,
 		'getImageHeight' : $ABSTRACT,
 		'getImageWidth'  : $ABSTRACT,
-		'onLoad'		 : $ABSTRACT
+		'onImageLoaded'	 : $ABSTRACT
 	});
 });
 
-$CLASS('UI.IXImage.DrawType', function(){})
+$CLASS('UI.IXImage.DrawType', function(me){})
 .$STATIC({
 	'DIT_UNKNOW' : new UI.IXImage.DrawType(),
 	'DIT_NORMAL' : new UI.IXImage.DrawType(),
@@ -10889,7 +10924,7 @@ $CLASS('UI.IXImage.DrawType', function(){})
 
 $CLASS('UI.XImageCanvasImage', 
 $EXTENDS(UI.IXImage),
-function(){
+function(me){
 
 	var m_img;
 	var m_buffer;
@@ -10903,7 +10938,12 @@ function(){
 	var m_dst_rect = new UI.Rect();
 	var m_part_rect = new UI.Rect();
 
+	var m_unloaded_part_rect = null;
+	var m_unloaded_src_rect = null;
+	var m_unloaded_draw_type = null;
+
 	var m_loaded = false;
+	var m_image_loaded_listener = [];
 
 
 	$PUBLIC({
@@ -10918,10 +10958,19 @@ function(){
 		'getImageWidth' : getImageWidth,
 		'getImageHeight' : getImageHeight,
 
-		'draw' : draw
+		'draw' : draw,
+
+		'onImageLoaded' : onImageLoaded,
+		'offImageLoaded' : offImageLoaded
 	});
 
 	function load(path) {
+
+		m_unloaded_src_rect = 
+		m_unloaded_part_rect = 
+		m_unloaded_draw_type =
+		null;
+
 		if (path.substr(0, 1) == '@')
 			loadAsResource(path.substr(1));
 		else 
@@ -10929,13 +10978,14 @@ function(){
 	}
 
 	function loadAsResource(path) { 
-		var mgr = new UI.ResourceMgr.$S('instance')();
+		var mgr = UI.ResourceMgr.$S('instance')();
 		mgr.getResourcePath(path, function(real_path){
-			load(real_path); 
+			loadImageObject(real_path); 
 		});
 	}
 	
 	function loadImageObject(path) {
+
 		m_loaded = false;
 
 		m_img = new Image();
@@ -10945,7 +10995,6 @@ function(){
 	}
 
 	function onImgLoaded() {
-
 		m_loaded = true;
 
 		m_img = new UI.XCanvasImage(m_img);
@@ -10954,7 +11003,12 @@ function(){
 
 		loadFormattedImageInfo();
 
-		initSrcRect();
+		if (m_unloaded_src_rect) m_src_rect = m_unloaded_src_rect;
+		else initSrcRect();
+
+		$.each(m_image_loaded_listener, function(i,v){
+			v.call(me);
+		});
 	}
 
 
@@ -10966,8 +11020,8 @@ function(){
 		releaseBuffer();
 
 		m_buffer = document.createElement('canvas');
-		m_buffer.width = m_dst_rect.width;
-		m_buffer.height = m_dst_rect.height;
+		m_buffer.width = m_dst_rect.width();
+		m_buffer.height = m_dst_rect.height();
 
 		switch (m_draw_type)
 		{
@@ -10989,7 +11043,77 @@ function(){
 		}
 	}
 
+	function drawNormal(ctx) {
+
+		var width = m_src_rect.width();
+		var height = m_src_rect.height();
+
+		m_img.draw(ctx, 
+		new UI.Rect(m_src_rect.left, m_src_rect.top, width, height),
+		new UI.Rect(0, 0, width, height));
+	}
+
+	function drawStretch(ctx) {
+		m_img.draw(ctx, 
+		new UI.Rect(m_src_rect.left, m_src_rect.top, m_src_rect.width(), m_src_rect.height()),
+		new UI.Rect(0, 0, m_dst_rect.width(), m_dst_rect.height()));
+	}
+
+	function draw9Part(ctx) {
+		var rect_part_raw = new UI.Rect(m_part_rect);
+		rect_part_raw.offset(m_src_rect.leftTop());	
+		var rect_part = rect_part_raw.intersect(m_src_rect);
+		if (rect_part.isEmpty()) 
+			rect_part = new UI.Rect();
+
+		var src_rect_array = 
+		[
+			new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), new UI.Size(rect_part.left - m_src_rect.left, rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(rect_part.left, m_src_rect.top), new UI.Size(rect_part.width(), rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(rect_part.right, m_src_rect.top), new UI.Size(m_src_rect.right - rect_part.right, rect_part.top - m_src_rect.top)),
+			new UI.Rect(new UI.Pt(m_src_rect.left, rect_part.top), new UI.Size(rect_part.left - m_src_rect.left, rect_part.height())),
+			new UI.Rect(new UI.Pt(rect_part.left, rect_part.top), new UI.Size(rect_part.width(), rect_part.height())),
+			new UI.Rect(new UI.Pt(rect_part.right, rect_part.top), new UI.Size(m_src_rect.right - rect_part.right, rect_part.height())),
+			new UI.Rect(new UI.Pt(m_src_rect.left, rect_part.bottom), new UI.Size(rect_part.left - m_src_rect.left, m_src_rect.bottom - rect_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_part.left, rect_part.bottom), new UI.Size(rect_part.width(), m_src_rect.bottom - rect_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_part.right, rect_part.bottom), new UI.Size(m_src_rect.right - rect_part.right, m_src_rect.bottom - rect_part.bottom))
+		];
+
+		var rect_dst_part = new UI.Rect(rect_part.left - m_src_rect.left, rect_part.top - m_src_rect.top, 
+						m_dst_rect.right - (m_src_rect.right - rect_part.right) - m_dst_rect.left, 
+						m_dst_rect.bottom - (m_src_rect.bottom - rect_part.bottom) - m_dst_rect.top);
+
+		var dst_rect_array = 
+		[
+			new UI.Rect(new UI.Pt(0, 0), new UI.Size(rect_dst_part.left, rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, 0), new UI.Size(rect_dst_part.width(), rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, 0), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, rect_dst_part.top)),
+			new UI.Rect(new UI.Pt(0, rect_dst_part.top), new UI.Size(rect_dst_part.left, rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, rect_dst_part.top), new UI.Size(rect_dst_part.width(), rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, rect_dst_part.top), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, rect_dst_part.height())),
+			new UI.Rect(new UI.Pt(0, rect_dst_part.bottom), new UI.Size(rect_dst_part.left, m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_dst_part.left, rect_dst_part.bottom), new UI.Size(rect_dst_part.width(), m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom)),
+			new UI.Rect(new UI.Pt(rect_dst_part.right, rect_dst_part.bottom), new UI.Size(m_dst_rect.right - m_dst_rect.left - rect_dst_part.right, m_dst_rect.bottom - m_dst_rect.top - rect_dst_part.bottom))	
+		]
+
+
+		$.each(src_rect_array, function(i,v){
+			var src = v;
+			var dst = dst_rect_array[i];
+
+			if (src.isEmpty() || dst.isEmpty()) return;
+
+			m_img.draw(ctx, src, dst);
+		});
+	}
+
 	function loadFormattedImageInfo() {
+
+		if (m_unloaded_draw_type) {
+			m_draw_type = m_unloaded_draw_type;
+			return;
+		}
+
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
@@ -10997,7 +11121,8 @@ function(){
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH');
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART');
-			loadFormattedImagePartInfo();
+			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
+			else loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
 		}
 		else
@@ -11070,14 +11195,22 @@ function(){
 	}
 
 	function getImageWidth() {
+		if (!m_loaded) return 0;
 		return m_img.getWidth();
 	}
 
 	function getImageHeight() {
+		if (!m_loaded) return 0;
 		return m_img.getHeight();
 	}
 
 	function setSrcRect(rc) {
+
+		if (!m_loaded) {
+			m_unloaded_src_rect = rc;
+			return;
+		}
+
 		if (m_src_rect.equal(rc))
 			return;
 
@@ -11095,6 +11228,11 @@ function(){
 
 	function setDrawType(type) {
 
+		if (!m_loaded) {
+			m_unloaded_draw_type = type;
+			return;
+		}
+
 		if (m_draw_type == type)
 			return;
 
@@ -11103,6 +11241,11 @@ function(){
 	} 
 
 	function setPartRect(rc) {
+
+		if (!m_loaded) {
+			m_unloaded_part_rect = rc;
+			return;
+		}
 
 		if (m_part_rect.equal(rc))
 			return;
@@ -11132,13 +11275,26 @@ function(){
 
 		ctx.save();
 		ctx.globalAlpha = m_alpha;
-		m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
 		ctx.restore();
+	}
+
+	function onImageLoaded(fn) {
+		m_image_loaded_listener.push(fn);
+	}
+
+	function offImageLoaded(fn) {
+		var index = m_image_loaded_listener.indexOf(fn);
+		if (index == -1) return;
+		m_image_loaded_listener.splice(index, 1);
 	}
 
 });
 
-$CLASS('UI.XCanvasImage', function(){
+$CLASS('UI.XCanvasImage', function(me){
 
 
 	var canvas;
@@ -11156,19 +11312,24 @@ $CLASS('UI.XCanvasImage', function(){
 		'src' : ''
 	});
 
-	$CONSTRUCTOR(function(img_src){
+	$CONSTRUCTOR(function(img_src, sx, sy, sw, sh){
 
-		var width = img_src.width;
-		var height = img_src.height;
+		// overload function(img_src)
+
+		var width = sw || img_src.width;
+		var height = sh || img_src.height;
 
 		canvas = document.createElement('canvas');
 		canvas.width = width;
 		canvas.height = height;
 
 		var ctx = canvas.getContext('2d');
-		ctx.drawImage(img_src, 0, 0);
 
-		this.src = img_src.src;
+		if (typeof sx != 'undefined') 
+			ctx.drawImage(img_src, sx, sy, sw, sh, 0, 0, sw, sh);
+		else ctx.drawImage(img_src, 0, 0);
+
+		me.src = img_src.src;
 	});
 
 	function clip(x, y, width, height) {
@@ -11204,8 +11365,19 @@ $CLASS('UI.XCanvasImage', function(){
 				src.left, src.top, src.width(), src.height(),
 				drc.left, drc.top, drc.width(), drc.height());
 		}
-		else
-			ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+		else {
+
+			if ((sw != dw || sh != dh) && (canvas.width != sw || canvas.height != sh)) {
+				// BUGFIX: Canvas (IE11 & Chrome33) will do scaling interpolation
+				// beyond the sx,sy,sw,sh boundary. So we have to clip the image first.
+				var clipped_img = new UI.XCanvasImage(canvas, sx, sy, sw, sh);
+				clipped_img.draw(ctx, 0, 0, sw, sh, dx, dy, dw, dh);
+			} 
+			else
+				ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+
+		}
+			
 	}
 
 });

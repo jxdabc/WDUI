@@ -1,6 +1,6 @@
 ;
 
-$CLASS('UI.Pt', function(){
+$CLASS('UI.Pt', function(me){
 
 	$PUBLIC({
 		'x' : 0,
@@ -12,8 +12,8 @@ $CLASS('UI.Pt', function(){
 		if (typeof x != 'undefined' &&
 			typeof y != 'undefined')
 		{
-			this.x = x;
-			this.y = y;
+			me.x = x;
+			me.y = y;
 		}
 	});
 

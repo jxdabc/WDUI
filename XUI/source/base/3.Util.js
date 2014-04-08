@@ -8,3 +8,13 @@ function Exception(err, des) {
 	this.err = err;
 	this.des = des;
 }
+
+String.prototype.format = function()
+{
+    var args = arguments;
+    var count = 0;
+    return this.replace(/%/g,                
+        function(){
+            return args[count++];
+        });
+}

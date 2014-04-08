@@ -1,6 +1,6 @@
 ;
 
-$CLASS('XUIObject', function(){
+$CLASS('XUIObject', function(me){
 
 	$PUBLIC({
 		'toString' : toString,
@@ -12,11 +12,11 @@ $CLASS('XUIObject', function(){
 	});
 
 	function toString() {
-		return 'XUIObject: ' + this.classobj.classname;
+		return 'XUIObject: ' + me.classobj.classname;
 	}
 
 	function getClassName() {
-		return this.classobj.classname;
+		return me.classobj.classname;
 	}
 
 	function instanceOf(cls) {
@@ -29,7 +29,7 @@ $CLASS('XUIObject', function(){
 		if (typeof cls != "function")
 			return false;
 
-		var c = this.classobj;
+		var c = me.classobj;
 
 		return isCls1DerivedClassOfCls2(c, cls);		
 	}

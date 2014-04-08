@@ -1,4 +1,4 @@
-$CLASS('UI.XCanvasImage', function(){
+$CLASS('UI.XCanvasImage', function(me){
 
 
 	var canvas;
@@ -16,19 +16,24 @@ $CLASS('UI.XCanvasImage', function(){
 		'src' : ''
 	});
 
-	$CONSTRUCTOR(function(img_src){
+	$CONSTRUCTOR(function(img_src, sx, sy, sw, sh){
 
-		var width = img_src.width;
-		var height = img_src.height;
+		// overload function(img_src)
+
+		var width = sw || img_src.width;
+		var height = sh || img_src.height;
 
 		canvas = document.createElement('canvas');
 		canvas.width = width;
 		canvas.height = height;
 
 		var ctx = canvas.getContext('2d');
-		ctx.drawImage(img_src, 0, 0);
 
-		this.src = img_src.src;
+		if (typeof sx != 'undefined') 
+			ctx.drawImage(img_src, sx, sy, sw, sh, 0, 0, sw, sh);
+		else ctx.drawImage(img_src, 0, 0);
+
+		me.src = img_src.src;
 	});
 
 	function clip(x, y, width, height) {
@@ -64,8 +69,19 @@ $CLASS('UI.XCanvasImage', function(){
 				src.left, src.top, src.width(), src.height(),
 				drc.left, drc.top, drc.width(), drc.height());
 		}
-		else
-			ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+		else {
+
+			if ((sw != dw || sh != dh) && (canvas.width != sw || canvas.height != sh)) {
+				// BUGFIX: Canvas (IE11 & Chrome33) will do scaling interpolation
+				// beyond the sx,sy,sw,sh boundary. So we have to clip the image first.
+				var clipped_img = new UI.XCanvasImage(canvas, sx, sy, sw, sh);
+				clipped_img.draw(ctx, 0, 0, sw, sh, dx, dy, dw, dh);
+			} 
+			else
+				ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+
+		}
+			
 	}
 
 });
