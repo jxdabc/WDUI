@@ -8,7 +8,7 @@ function(me){
 	var m_buffer;
 
 	var m_draw_type = 
-		UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
+		UI.XImageCanvasImage.DrawType.DIT_NORMAL;
 	var m_formatted_img;
 	var m_alpha = 255;
 
@@ -56,7 +56,7 @@ function(me){
 	}
 
 	function loadAsResource(path) { 
-		var mgr = UI.XResourceMgr.$S('instance')();
+		var mgr = UI.XResourceMgr.instance();
 		mgr.getResourcePath(path, function(real_path){
 			loadImageObject(real_path); 
 		});
@@ -105,19 +105,19 @@ function(me){
 
 		switch (m_draw_type)
 		{
-			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL'): 
+			case UI.XImageCanvasImage.DrawType.DIT_NORMAL: 
 				drawNormal(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH'):  
+			case UI.XImageCanvasImage.DrawType.DIT_STRETCH:  
 				drawStretch(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART'): 
+			case UI.XImageCanvasImage.DrawType.DIT_9PART: 
 				draw9Part(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_3PARTH'): 
+			case UI.XImageCanvasImage.DrawType.DIT_3PARTH: 
 				draw3PartH(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.$S('DrawType').$S('DIT_3PARTV'): 
+			case UI.XImageCanvasImage.DrawType.DIT_3PARTV: 
 				draw3PartV(m_buffer.getContext('2d')); 
 				break;
 		}
@@ -206,11 +206,11 @@ function(me){
 	function loadFormattedImageInfo() {
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
-			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
+			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_NORMAL;
 		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
-			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_STRETCH');
+			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_STRETCH;
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
-			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_9PART');
+			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_9PART;
 			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
 			else loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);

@@ -4,6 +4,8 @@
 
 	var object_info_stack = [];
 
+	var static_inheritance_ignore_list = ['empty_obj_factory', 'classname', 'parent_classes', '$STATIC'];
+
 	window.$CLASS = function(name, extend_list, scope) {
 
 		/* overload function(name, scope) */
@@ -23,14 +25,31 @@
 		var prototype = {'constructor' : null, 'classobj' : factory};
 		factory.prototype = empty_obj_factory.prototype = prototype;
 
+		factory.empty_obj_factory = empty_obj_factory;
 		factory.classname = name;
 		factory.parent_classes = [];
-		$.each(extend_list || [], function(i,v){
-			factory.parent_classes.push(v);
+
+		$.each(extend_list || [], function(i, parent) {
+			factory.parent_classes.push(parent);
+			$.each(parent, function(i,v) {
+				if (!parent.hasOwnProperty(i)) return;
+				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
+				console.log(i);
+				Object.defineProperty(factory, i, 
+				{
+					set: function (val) 
+					{
+						parent[i] = val;
+					},
+					get: function () 
+					{
+						return parent[i];
+					}
+				});
+			});
 		});
 
 		factory.$STATIC = dealWithStatic;
-		factory.$S = getStatic;
 
 		function empty_obj_factory() {}
 		function factory() {
@@ -40,6 +59,11 @@
 
 			var me = this;
 			var my_arguments = arguments;
+
+			$.each(this, function(i, v){
+				if (!me.hasOwnProperty(i)) return;
+				throw new Exception('XUIClass::ONE', 'XUIClass: Object to be constructed is not empty. ');
+			});
 
 			object_info_stack.push({});
 			scope(this);
@@ -54,15 +78,13 @@
 				v.apply(me, 
 					[extend_list_with_args].concat(Array.prototype.slice.call(my_arguments, 0)));
 			});
-			$.each(extend_list || [], function(i,v){
-				v.apply(me, extend_list_with_args[v.classname] || []);
-			});
+			addParentObject(this, extend_list, extend_list_with_args);
 
 			// Member initialization. 
 			$.each(object_info.public_list || [], function(i,v){
 				$.each(v, function(ii,vv){
 					me[ii] = vv;
-				})
+				});
 			});
 
 			// Self construction. 
@@ -74,6 +96,62 @@
 		}
 
 		return factory;
+	}
+
+	function addParentObject(object, extend_list, extend_list_with_args) {
+
+		var parent_list =[];
+
+		$.each(extend_list || [], function(i,v){
+
+			var name = v.classname;
+			var parent = new v.empty_obj_factory();
+			parent_list.push({'name' : name, 'obj' : parent});
+			
+			v.apply(object, extend_list_with_args[name] || []);
+			$.each(object, function(i,v){
+				if (!object.hasOwnProperty(i)) return;
+				Object.defineProperty(parent, i, 
+					Object.getOwnPropertyDescriptor(object, i));
+				delete object.i;
+			});
+
+			$.each(parent_list, function(i,v){
+				var parent = v.obj;
+				$.each(parent, function(i,v){
+					if (!parent.hasOwnProperty(i)) return;
+					if (i == '$PARENT') return;
+					Object.defineProperty(object, i, 
+					{
+						set: function (val) 
+						{
+							parent[i] = val;
+						},
+						get: function () 
+						{
+							return parent[i];
+						}
+					});
+				});
+			});
+		});
+
+		object.$PARENT = function (name) {
+
+			var direct_parent = null;
+			$.each(parent_list, function(i,v){
+				if (direct_parent) return;
+				if (v.name == name) direct_parent = v.obj;
+			});
+			if (direct_parent) return direct_parent;
+			var rst = null;
+			$.each(parent_list, function(i,v){
+				if (rst) return;
+				rst = v.obj.$PARENT(name);
+			});
+
+			return rst;
+		}
 	}
 
 	window.$EXTENDS = function(/* parent1, parent2, parent3, ... , parentN */) {
@@ -103,27 +181,12 @@
 			'Abstract funtion not implemented. '); 
 	}
 
-	function getStatic(name) {
-		return dealWithStatic.call(this, name)[name];
-	}
 
-	function dealWithStatic(name_or_list) {
-
-		if (typeof name_or_list == "string") {
-			var name = name_or_list;
-			if (typeof this[name] !== 'undefined') return this;
-			for (var i = 0; i < this.parent_classes.length; i++) {
-				var rst = dealWithStatic.apply(this.parent_classes[i], arguments);
-				if (rst) return rst;
-			}
-			return undefined;
-		} else {
-			var list = name_or_list;
-			var me = this;
-			$.each(list, function(i,v){
-				me[i] = v;
-			});
-		}
+	function dealWithStatic(list) {
+		var me = this;
+		$.each(list, function(i,v){
+			me[i] = v;
+		});
 	}
 
 
