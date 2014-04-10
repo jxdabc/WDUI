@@ -15,7 +15,7 @@ $CLASS('UI.Rect', function(me){
 		'area' 			: area,
 		'isEmpty' 		: isEmpty,
 
-		'equal' 		: equal,
+		'equals' 		: equals,
 
 		'intersect' 	: intersect,
 
@@ -61,7 +61,7 @@ $CLASS('UI.Rect', function(me){
 
 	function width () { return me.right - me.left; }
 	function height () { return me.bottom - me.top; }
-	function equal (rc) {
+	function equals (rc) {
 		return me.top == rc.top &&
 			me.bottom == rc.bottom &&
 			me.left == rc.left &&

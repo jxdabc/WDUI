@@ -4,8 +4,8 @@
 </canvas>
 
 <script type="text/javascript">
-	var canvas = $('#test_canvas')[0];
-	var ctx = canvas.getContext('2d');
+	var canvas2 = $('#test_canvas')[0];
+	var ctx = canvas2.getContext('2d');
 
 	var img = new UI.XImageCanvasImage();
 
@@ -15,5 +15,82 @@
 
 	img.load('@bgalpha.9.png');
 	img.setDstRect(new UI.Rect(50,50,750,750));
-	//img.setDrawType(UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL'));
+
+	// ctx.strokeRect(0, 0, 200, 200);
+	// ctx.strokeRect(200, 0, 200, 200);
+	// ctx.strokeRect(400, 0, 200, 200);
+	// ctx.strokeRect(0, 200, 200, 200);
+	// ctx.strokeRect(200, 200, 200, 200);
+	// ctx.strokeRect(400, 200, 200, 200);
+	// ctx.strokeRect(0, 400, 200, 200);
+	// ctx.strokeRect(200, 400, 200, 200);
+	// ctx.strokeRect(400, 400, 200, 200);
+
+	// var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
+
+	// var text = new UI.XTextCanvasText();
+	// text.setText(str);
+	// text.setFont('宋体', 12, UI.XTextCanvasText.Style.STYLE_ITALIC);
+	// text.setColor('#FF0000');
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+	// 	UI.XTextCanvasText.Align.ALIGN_START);
+	// text.setDstRect(new UI.Rect(0, 0, 200, 200));
+	// text.draw(ctx, new UI.Rect(0, 0, 200, 200));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+	// text.setDstRect(new UI.Rect(200, 0, 400, 200));
+	// text.draw(ctx, new UI.Rect(200, 0, 400, 200));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+	// 	UI.XTextCanvasText.Align.ALIGN_END);
+	// text.setDstRect(new UI.Rect(400, 0, 600, 200));
+	// text.draw(ctx, new UI.Rect(400, 0, 600, 200));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+	// 	UI.XTextCanvasText.Align.ALIGN_START);
+	// text.setDstRect(new UI.Rect(0, 200, 200, 400));
+	// text.draw(ctx, new UI.Rect(0, 200, 200, 400));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+	// text.setDstRect(new UI.Rect(200, 200, 400, 400));
+	// text.draw(ctx, new UI.Rect(200, 200, 400, 400));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+	// 	UI.XTextCanvasText.Align.ALIGN_END);
+	// text.setDstRect(new UI.Rect(400, 200, 600, 400));
+	// text.draw(ctx, new UI.Rect(400, 200, 600, 400));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+	// 	UI.XTextCanvasText.Align.ALIGN_START);
+	// text.setDstRect(new UI.Rect(0, 400, 200, 600));
+	// text.draw(ctx, new UI.Rect(0, 400, 200, 600));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+	// text.setDstRect(new UI.Rect(200, 400, 400, 600));
+	// text.draw(ctx, new UI.Rect(200, 400, 400, 600));
+
+	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+	// 	UI.XTextCanvasText.Align.ALIGN_END);
+	// text.setDstRect(new UI.Rect(400, 400, 600, 600));
+	// text.draw(ctx, new UI.Rect(400, 400, 600, 600));
+
+
+	// var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
+
+	// var s = new UI.XCanvasText();
+	// s.setFontSize(22);
+	// s.draw(ctx, str, new UI.Rect(0, 0, 200, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_START);
+	// s.draw(ctx, str, new UI.Rect(200, 0, 400, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_MIDDLE);
+	// s.draw(ctx, str, new UI.Rect(400, 0, 600, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_END);
+	// s.draw(ctx, str, new UI.Rect(0, 200, 200, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_START);
+	// s.draw(ctx, str, new UI.Rect(200, 200, 400, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_MIDDLE);
+	// s.draw(ctx, str, new UI.Rect(400, 200, 600, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_END);
+	// s.draw(ctx, str, new UI.Rect(0, 400, 200, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_START);
+	// s.draw(ctx, str, new UI.Rect(200, 400, 400, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_MIDDLE);
+	// s.draw(ctx, str, new UI.Rect(400, 400, 600, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_END);
+
 </script>

@@ -10642,7 +10642,7 @@ $CLASS('UI.Rect', function(me){
 		'area' 			: area,
 		'isEmpty' 		: isEmpty,
 
-		'equal' 		: equal,
+		'equals' 		: equals,
 
 		'intersect' 	: intersect,
 
@@ -10688,7 +10688,7 @@ $CLASS('UI.Rect', function(me){
 
 	function width () { return me.right - me.left; }
 	function height () { return me.bottom - me.top; }
-	function equal (rc) {
+	function equals (rc) {
 		return me.top == rc.top &&
 			me.bottom == rc.bottom &&
 			me.left == rc.left &&
@@ -10773,7 +10773,7 @@ $CLASS('UI.Pt', function(me){
 
 (function(){
 
-	$CLASS('UI.ResourceMgr', function(){
+	$CLASS('UI.XResourceMgr', function(){
 
 	
 		$PUBLIC({
@@ -10853,7 +10853,7 @@ $CLASS('UI.Pt', function(me){
 	var resource_mgr_instance;
 	function resourceMgrInstance() {
 		if (!resource_mgr_instance)
-			resource_mgr_instance = new UI.ResourceMgr();
+			resource_mgr_instance = new UI.XResourceMgr();
 
 		return resource_mgr_instance;
 	}
@@ -10920,6 +10920,171 @@ $CLASS('UI.IXImage.DrawType', function(me){})
 
 
 
+$CLASS('UI.XTextCanvasText', function(me){
+
+	$PUBLIC({
+		'draw' : draw,
+
+		'setAlpha' 		: setAlpha,
+		'setDstRect' 	: setDstRect,
+
+		'getText'		: getText,
+		'measure'		: measure,
+
+		'setText'		: setText,
+		'setFont'		: setFont,
+		'setColor'		: setColor,
+		'setAlignment'	: setAlignment,
+	});
+
+
+	var m_alpha = 255;
+	var m_dst_rect = new UI.Rect();
+	var m_text = '';
+	var m_face = 'Verdana, Arial, 微软雅黑, 宋体';
+	var m_size = 12;
+	var m_style = UI.XTextCanvasText.Style.STYLE_NORMAL;
+	var m_color = '#000';
+	var m_halign = UI.XTextCanvasText.Align.ALIGN_START;
+	var m_valign = UI.XTextCanvasText.Align.ALIGN_START;
+
+	var m_buffer = null;
+
+
+	function setAlpha(alpha) {
+		m_alpha = alpha;
+	};
+
+	function setDstRect(rc) {
+		if (rc.equals(m_dst_rect)) return;
+
+		releaseBuffer();
+		m_dst_rect  = rc;
+	}
+
+	function setText(text) {
+		
+		if (text == m_text) return;
+
+		releaseBuffer();
+		m_text = text;
+	}
+
+	function getText() {
+		return m_text;
+	}
+
+	function setFont(face, size, style) {
+		if (m_face == face &&
+			m_size == size &&
+			m_style == style)
+			return;
+
+		releaseBuffer();
+		m_face = face;
+		m_size = size;
+		m_style = style;
+	}
+
+	function setColor(color) {
+		m_color = color;
+	}
+
+	function setAlignment(halign, valign) {
+		if (m_halign == halign
+			&& m_valign == valign)
+			return;
+
+		releaseBuffer();
+		m_halign = halign;
+		m_valign = valign;
+	}
+
+
+	function releaseBuffer() {
+		m_buffer = null;		
+	}
+
+	function refreshBuffer() {
+		releaseBuffer();
+
+		m_buffer = document.createElement('canvas');
+		m_buffer.width = m_dst_rect.width();
+		m_buffer.height = m_dst_rect.height();
+
+		var canvas_text = new UI.XCanvasText();
+		canvas_text.setFontFace(m_face);
+		canvas_text.setFontSize(m_size);
+		canvas_text.setFontColor(m_color);
+
+		canvas_text.setBold(
+			!!(m_style & UI.XTextCanvasText.Style.STYLE_BOLD)
+		);
+		canvas_text.setItalic(
+			!!(m_style & UI.XTextCanvasText.Style.STYLE_ITARIC)
+		);
+
+		canvas_text.draw(m_buffer.getContext('2d'),
+			m_text, 
+			new UI.Rect(new UI.Pt(0, 0), new UI.Size(m_dst_rect.width(), m_dst_rect.height())),
+			convertAlignment(m_halign),
+			convertAlignment(m_valign)
+		);
+	}
+
+	function draw(ctx, rect_to_draw) {
+		if (!m_buffer) refreshBuffer();
+
+		var dst_to_draw_real =
+			rect_to_draw.intersect(m_dst_rect);
+
+		if (dst_to_draw_real.isEmpty()) return;
+
+		var src_to_draw_real = 
+			new UI.Rect(dst_to_draw_real);
+		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
+
+		ctx.save();
+		ctx.globalAlpha = m_alpha;
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
+		ctx.restore();
+	}
+
+	function measure() {
+
+	}
+
+	function convertAlignment(this_align) {
+		switch (this_align) {
+			case UI.XTextCanvasText.Align.ALIGN_START:
+				return UI.XCanvasText.Align.ALIGN_START;
+			case UI.XTextCanvasText.Align.ALIGN_MIDDLE:
+				return UI.XCanvasText.Align.ALIGN_MIDDLE;
+			case UI.XTextCanvasText.Align.ALIGN_END:
+				return UI.XCanvasText.Align.ALIGN_END;
+		}
+	}
+
+
+});
+
+
+$CLASS('UI.XTextCanvasText.Align', function(me){})
+.$STATIC({
+	'ALIGN_START' 	: new UI.XTextCanvasText.Align(),
+	'ALIGN_MIDDLE'	: new UI.XTextCanvasText.Align(),
+	'ALIGN_END'		: new UI.XTextCanvasText.Align()
+});
+
+$CLASS('UI.XTextCanvasText.Style', function(me){})
+.$STATIC({
+	'STYLE_NORMAL'		: 0x0,
+	'STYLE_ITARIC' 		: 0x1,
+	'STYLE_BOLD'		: 0x2,
+	'STYLE_ITARIC_BOLD' : 0x3
+});
 ;
 
 $CLASS('UI.XImageCanvasImage', 
@@ -10978,7 +11143,7 @@ function(me){
 	}
 
 	function loadAsResource(path) { 
-		var mgr = UI.ResourceMgr.$S('instance')();
+		var mgr = UI.XResourceMgr.$S('instance')();
 		mgr.getResourcePath(path, function(real_path){
 			loadImageObject(real_path); 
 		});
@@ -11002,6 +11167,8 @@ function(me){
 		releaseBuffer();
 
 		loadFormattedImageInfo();
+		m_draw_type = m_unloaded_draw_type || m_draw_type;
+		m_part_rect = m_unloaded_part_rect || m_part_rect;
 
 		if (m_unloaded_src_rect) m_src_rect = m_unloaded_src_rect;
 		else initSrcRect();
@@ -11107,13 +11274,23 @@ function(me){
 		});
 	}
 
+	function draw3PartH(ctx) {
+
+		if (m_part_rect.top != 0 || m_part_rect.bottom != m_img.getHeight())
+			throw new Exception('UI.XImageCanvasImage::D3PHPW', 
+				'UI.XImageCanvasImage: Drawing 3 part horizontally with a wrong part rect. ');
+		draw9Part(ctx);
+	}
+
+	function draw3PartV(ctx) {
+		if (m_part_rect.left != 0 || m_part_rect.right != m_img.getWidth())
+			throw new Exception('UI.XImageCanvasImage::D3PVPW', 
+				'UI.XImageCanvasImage: Drawing 3 part vertically with a wrong part rect. ');
+		draw9Part(ctx);
+	}
+
+
 	function loadFormattedImageInfo() {
-
-		if (m_unloaded_draw_type) {
-			m_draw_type = m_unloaded_draw_type;
-			return;
-		}
-
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
 			m_draw_type = UI.XImageCanvasImage.$S('DrawType').$S('DIT_NORMAL');
@@ -11211,7 +11388,7 @@ function(me){
 			return;
 		}
 
-		if (m_src_rect.equal(rc))
+		if (m_src_rect.equals(rc))
 			return;
 
 		releaseBuffer();
@@ -11219,7 +11396,7 @@ function(me){
 	}
 
 	function setDstRect(rc) {
-		if (m_dst_rect.equal(rc))
+		if (m_dst_rect.equals(rc))
 			return;
 
 		releaseBuffer();
@@ -11247,7 +11424,7 @@ function(me){
 			return;
 		}
 
-		if (m_part_rect.equal(rc))
+		if (m_part_rect.equals(rc))
 			return;
 
 		releaseBuffer();
@@ -11294,10 +11471,180 @@ function(me){
 
 });
 
+
+
+
+$CLASS('UI.XCanvasText', function(me){
+
+	$PUBLIC({
+		'draw' : draw,
+
+		'setFontFace'	: setFontFace,
+		'setFontSize'	: setFontSize,     // Number. Measured by px.
+		'setLineHeight' : setLineHeight, 
+		'setFontColor'	: setFontColor,
+
+		'setBold' 		: setBold,
+		'setItalic' 	: setItalic
+	});
+
+	
+	var m_font_face = 'Verdana, Arial, 微软雅黑, 宋体';
+	var m_font_size = 12;
+	var m_font_color = '#000';
+
+	var m_bold = false;
+	var m_italic = false;
+
+	var m_line_height = 12 * 1.5;
+
+	var $body = $('BODY');
+
+
+	function draw(ctx, string, rect, halign, valign) {
+
+		ctx.save();
+
+		ctx.beginPath();
+		ctx.rect(rect.left, rect.top, rect.width(), rect.height());
+		ctx.clip();
+
+		var font = '';
+		if (m_italic) font += 'italic ';
+		if (m_bold) font += 'bold ';
+		font += m_font_size + 'px' + ' ';
+		font += m_font_face + ' ';
+
+		ctx.font = font;
+		ctx.fillStyle = m_font_color;
+		ctx.textBaseline = 'top';
+
+		var lines = stringToLines(string, rect.width(), ctx);
+
+		var y_start = getYStart(valign, lines.length, rect.height());
+		var y_current = y_start;
+		for (var i = 0; i < lines.length; i++) {
+
+			var c = lines[i];
+			var x_current = getXStart(halign, c.width, rect.width());
+
+			ctx.fillText(c.text, rect.left + x_current, rect.top + y_current);
+
+			y_current += m_line_height;
+		}
+
+		ctx.restore();
+	}
+
+	function getYStart(valign, line_count, height) {
+		
+		if (valign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+			return (height - line_count * m_line_height) / 2;
+
+		if (valign == UI.XCanvasText.Align.ALIGN_END)
+			return height - line_count * m_line_height;
+
+		return 0;
+	}
+
+	function getXStart(halign, line_width, width) {
+
+		if (halign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+			return (width - line_width) / 2;
+
+		if (halign == UI.XCanvasText.Align.ALIGN_END)
+			return width - line_width;
+
+		return 0;
+	}
+
+	function stringToLines(string, max_width, ctx) {
+
+		var lines = [];
+		var words = stringToWordArray(string);
+
+		var line = null;
+		var width = 0;
+		for (var i = 0; i < words.length;) {
+			if (!line) {
+				line = words[i];
+				width = ctx.measureText(line).width;
+				i++;
+				continue;
+			}
+
+			var new_line = line + words[i];
+			var new_width = ctx.measureText(new_line).width;
+			if (new_width > max_width) {
+				lines.push({'text' : line, 'width' : width});
+				line = null;
+				width = 0;
+				continue;
+			}
+
+			line = new_line;
+			width = new_width;
+			i++;
+		}
+
+		if (line) lines.push({'text' : line, 'width' : width});
+
+		return lines;
+	}
+
+	function stringToWordArray(string) {
+		var rst = [];
+		var en_split = string.split(/\b/);
+		$.each(en_split, function(i,v){
+			rst = rst.concat(v.split(/(?![a-zA-Z_0-9])/));
+		});
+
+		return rst;
+	}
+
+	function measureText(string) {
+	}
+
+	function setBold(b) {
+		m_bold = b;
+	}
+
+	function setItalic(b) {
+		m_italic = b;
+	}
+
+	function setFontFace(face) {
+		m_font_face = face;
+	}
+
+	function setFontSize(size) {
+		m_font_size = size - 0;
+		m_line_height = size * 1.5;
+	}
+
+	function setLineHeight(size) {
+		m_line_height = size - 0;
+	}
+
+	function setFontColor(color) {
+		m_font_color = color;
+	}
+	
+
+
+});
+
+$CLASS('UI.XCanvasText.Align', function(me){
+})
+.$STATIC({
+	'ALIGN_START' 	: new UI.XCanvasText.Align(),
+	'ALIGN_MIDDLE' 	: new UI.XCanvasText.Align(),
+	'ALIGN_END' 	: new UI.XCanvasText.Align()
+});
 $CLASS('UI.XCanvasImage', function(me){
 
 
-	var canvas;
+	var m_canvas;
 
 	$PUBLIC({
 		'getWidth' : getWidth,
@@ -11319,11 +11666,11 @@ $CLASS('UI.XCanvasImage', function(me){
 		var width = sw || img_src.width;
 		var height = sh || img_src.height;
 
-		canvas = document.createElement('canvas');
-		canvas.width = width;
-		canvas.height = height;
+		m_canvas = document.createElement('canvas');
+		m_canvas.width = width;
+		m_canvas.height = height;
 
-		var ctx = canvas.getContext('2d');
+		var ctx = m_canvas.getContext('2d');
 
 		if (typeof sx != 'undefined') 
 			ctx.drawImage(img_src, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -11339,23 +11686,23 @@ $CLASS('UI.XCanvasImage', function(me){
 		new_canvas.height = height;
 
 		var ctx = new_canvas.getContext('2d');
-		ctx.drawImage(canvas, x, y, width, height,
+		ctx.drawImage(m_canvas, x, y, width, height,
 			0, 0, width, height);
-		canvas = new_canvas;
+		m_canvas = new_canvas;
 	}
 
-	function getWidth() {return canvas.width;}
-	function getHeight() {return canvas.height;}
+	function getWidth() {return m_canvas.width;}
+	function getHeight() {return m_canvas.height;}
 
 
 	function getCanvas() {
-		return canvas;
+		return m_canvas;
 	}
 
 	function getImageData() {
-		return canvas
+		return m_canvas
 			.getContext('2d')
-			.getImageData(0, 0, canvas.width, canvas.height);
+			.getImageData(0, 0, m_canvas.width, m_canvas.height);
 	}
 
 	function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
@@ -11367,14 +11714,14 @@ $CLASS('UI.XCanvasImage', function(me){
 		}
 		else {
 
-			if ((sw != dw || sh != dh) && (canvas.width != sw || canvas.height != sh)) {
+			if ((sw != dw || sh != dh) && (m_canvas.width != sw || m_canvas.height != sh)) {
 				// BUGFIX: Canvas (IE11 & Chrome33) will do scaling interpolation
 				// beyond the sx,sy,sw,sh boundary. So we have to clip the image first.
-				var clipped_img = new UI.XCanvasImage(canvas, sx, sy, sw, sh);
+				var clipped_img = new UI.XCanvasImage(m_canvas, sx, sy, sw, sh);
 				clipped_img.draw(ctx, 0, 0, sw, sh, dx, dy, dw, dh);
 			} 
 			else
-				ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+				ctx.drawImage(m_canvas, sx, sy, sw, sh, dx, dy, dw, dh);
 
 		}
 			
