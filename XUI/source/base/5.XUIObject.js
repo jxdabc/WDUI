@@ -5,8 +5,7 @@ $CLASS('XUIObject', function(me){
 	$PUBLIC({
 		'toString' : toString,
 		'getClassName' : getClassName,
-		'instanceOf' : instanceOf,
-		'm' : 123
+		'instanceOf' : instanceOf
 	});
 
 	$CONSTRUCTOR(function(){

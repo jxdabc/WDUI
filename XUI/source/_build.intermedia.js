@@ -10396,9 +10396,11 @@ String.prototype.format = function()
 			$.each(parent, function(i,v) {
 				if (!parent.hasOwnProperty(i)) return;
 				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
-				console.log(i);
+				// console.log(i);
 				Object.defineProperty(factory, i, 
 				{
+					enumerable : true,
+					configurable : true,
 					set: function (val) 
 					{
 						parent[i] = val;
@@ -10445,7 +10447,12 @@ String.prototype.format = function()
 			// Member initialization. 
 			$.each(object_info.public_list || [], function(i,v){
 				$.each(v, function(ii,vv){
-					me[ii] = vv;
+					Object.defineProperty(me, ii, {
+						enumerable : true,
+						configurable : true,
+						writable : true,
+						value : vv
+					});
 				});
 			});
 
@@ -10475,25 +10482,27 @@ String.prototype.format = function()
 				if (!object.hasOwnProperty(i)) return;
 				Object.defineProperty(parent, i, 
 					Object.getOwnPropertyDescriptor(object, i));
-				delete object.i;
+				delete object[i];
 			});
+		});
 
-			$.each(parent_list, function(i,v){
-				var parent = v.obj;
-				$.each(parent, function(i,v){
-					if (!parent.hasOwnProperty(i)) return;
-					if (i == '$PARENT') return;
-					Object.defineProperty(object, i, 
+		$.each(parent_list, function(i,v){
+			var parent = v.obj;
+			$.each(parent, function(i,v){
+				if (!parent.hasOwnProperty(i)) return;
+				if (i == '$PARENT') return;
+				Object.defineProperty(object, i, 
+				{
+					enumerable : true,
+					configurable : true,
+					set: function (val) 
 					{
-						set: function (val) 
-						{
-							parent[i] = val;
-						},
-						get: function () 
-						{
-							return parent[i];
-						}
-					});
+						parent[i] = val;
+					},
+					get: function () 
+					{
+						return parent[i];
+					}
 				});
 			});
 		});
@@ -10547,7 +10556,12 @@ String.prototype.format = function()
 	function dealWithStatic(list) {
 		var me = this;
 		$.each(list, function(i,v){
-			me[i] = v;
+			Object.defineProperty(me, i, {
+				enumerable : true,
+				configurable : true,
+				writable : true,
+				value : v
+			});
 		});
 	}
 
@@ -10578,8 +10592,7 @@ $CLASS('XUIObject', function(me){
 	$PUBLIC({
 		'toString' : toString,
 		'getClassName' : getClassName,
-		'instanceOf' : instanceOf,
-		'm' : 123
+		'instanceOf' : instanceOf
 	});
 
 	$CONSTRUCTOR(function(){

@@ -1,96 +1,329 @@
+<!DOCTYPE html>
+
+<!-- meta http-equiv="Content-Type" content="text/html; charset=utf-8" -->
+
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
-<canvas width="800" height="800" id="test_canvas">
+<canvas width="800" height="5000" id="test_canvas">
 </canvas>
 
 <script type="text/javascript">
-	var canvas2 = $('#test_canvas')[0];
-	var ctx = canvas2.getContext('2d');
-
-	var img = new UI.XImageCanvasImage();
-
-	img.onImageLoaded(function(){
-		this.draw(ctx, new UI.Rect(50,50,750,750))
-	});
-
-	img.load('@bgalpha.9.png');
-	img.setDstRect(new UI.Rect(50,50,750,750));
-
-	// ctx.strokeRect(0, 0, 200, 200);
-	// ctx.strokeRect(200, 0, 200, 200);
-	// ctx.strokeRect(400, 0, 200, 200);
-	// ctx.strokeRect(0, 200, 200, 200);
-	// ctx.strokeRect(200, 200, 200, 200);
-	// ctx.strokeRect(400, 200, 200, 200);
-	// ctx.strokeRect(0, 400, 200, 200);
-	// ctx.strokeRect(200, 400, 200, 200);
-	// ctx.strokeRect(400, 400, 200, 200);
-
-	// var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
-
-	// var text = new UI.XTextCanvasText();
-	// text.setText(str);
-	// text.setFont('宋体', 12, UI.XTextCanvasText.Style.STYLE_ITALIC);
-	// text.setColor('#FF0000');
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
-	// 	UI.XTextCanvasText.Align.ALIGN_START);
-	// text.setDstRect(new UI.Rect(0, 0, 200, 200));
-	// text.draw(ctx, new UI.Rect(0, 0, 200, 200));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
-	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
-	// text.setDstRect(new UI.Rect(200, 0, 400, 200));
-	// text.draw(ctx, new UI.Rect(200, 0, 400, 200));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
-	// 	UI.XTextCanvasText.Align.ALIGN_END);
-	// text.setDstRect(new UI.Rect(400, 0, 600, 200));
-	// text.draw(ctx, new UI.Rect(400, 0, 600, 200));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
-	// 	UI.XTextCanvasText.Align.ALIGN_START);
-	// text.setDstRect(new UI.Rect(0, 200, 200, 400));
-	// text.draw(ctx, new UI.Rect(0, 200, 200, 400));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
-	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
-	// text.setDstRect(new UI.Rect(200, 200, 400, 400));
-	// text.draw(ctx, new UI.Rect(200, 200, 400, 400));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
-	// 	UI.XTextCanvasText.Align.ALIGN_END);
-	// text.setDstRect(new UI.Rect(400, 200, 600, 400));
-	// text.draw(ctx, new UI.Rect(400, 200, 600, 400));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
-	// 	UI.XTextCanvasText.Align.ALIGN_START);
-	// text.setDstRect(new UI.Rect(0, 400, 200, 600));
-	// text.draw(ctx, new UI.Rect(0, 400, 200, 600));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
-	// 	UI.XTextCanvasText.Align.ALIGN_MIDDLE);
-	// text.setDstRect(new UI.Rect(200, 400, 400, 600));
-	// text.draw(ctx, new UI.Rect(200, 400, 400, 600));
-
-	// text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
-	// 	UI.XTextCanvasText.Align.ALIGN_END);
-	// text.setDstRect(new UI.Rect(400, 400, 600, 600));
-	// text.draw(ctx, new UI.Rect(400, 400, 600, 600));
 
 
-	// var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
+	// Test Inheritance
+	(function(){
 
-	// var s = new UI.XCanvasText();
-	// s.setFontSize(22);
-	// s.draw(ctx, str, new UI.Rect(0, 0, 200, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_START);
-	// s.draw(ctx, str, new UI.Rect(200, 0, 400, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_MIDDLE);
-	// s.draw(ctx, str, new UI.Rect(400, 0, 600, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_END);
-	// s.draw(ctx, str, new UI.Rect(0, 200, 200, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_START);
-	// s.draw(ctx, str, new UI.Rect(200, 200, 400, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_MIDDLE);
-	// s.draw(ctx, str, new UI.Rect(400, 200, 600, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_END);
-	// s.draw(ctx, str, new UI.Rect(0, 400, 200, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_START);
-	// s.draw(ctx, str, new UI.Rect(200, 400, 400, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_MIDDLE);
-	// s.draw(ctx, str, new UI.Rect(400, 400, 600, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_END);
+		$CLASS('TEST', function(me){});
+
+		$CLASS('TEST.BASE1', function(me) {
+
+			var a = 10;
+
+			$PUBLIC({
+				'a' : 10,
+				'b' : 20,
+				'c' : 30,
+				'd' : function () {return 'BASE1::d';},
+				'e' : function () {return 'BASE1::e';},
+				'f' : function () {return 'BASE1::f';},
+				'po1' : function() {return me.e();},
+				'po2' : function() {return me.c;},
+				'setPrivate' : function(v) { a = v; },
+				'getPrivate' : function() {return a; },
+				'md' : 10
+			});
+		})
+		.$STATIC({
+			'D1' : 10,
+			'D2' : 20,
+			'M1' : function () {return 'TEST.BASE1:M1';},
+			'M2' : function () {return 'TEST.BASE1:M2';}
+		});
+
+
+		$CLASS('TEST.BASE2', function(me) {
+			$PUBLIC({
+				'a' : 10,
+				'b' : 20,
+				'c' : 130,
+				'd' : function () {return 'BASE2::d';},
+				'md' : 10,
+				'md2' : 20,
+			});
+		})
+		.$STATIC({
+			'MD2' : 10,
+			'MD' : 10,
+			'D1' : 50,
+			'M1' : function () {return 'TEST.BASE2:M2';},
+
+		});
+
+		$CLASS('TEST.DRIVED1', 
+		$EXTENDS(TEST.BASE1, TEST.BASE2),
+		function(me){
+
+
+			$PUBLIC({
+				'a' : 110,
+				'd' : function () {return 'DRIVED1::d';},
+				'md' : 10
+			});
+
+		})
+		.$STATIC({
+			'MD' : 10,
+			'M1' : function () {return 'TEST.DRIVED1:M1';}
+		});
+
+		$CLASS('TEST.DRIVED2', 
+		$EXTENDS(TEST.DRIVED1),
+		function(me){
+			$PUBLIC({
+				'c'  : 110,
+				'nd' : 111,
+				'e'  : function () {return 'DRIVED2::e';},
+				'nf' : function () {return 'DRIVED2::nf';}
+				
+			});
+		})
+		.$STATIC({
+			'D2' : 110,
+			'M2' : function () {return 'TEST.DRIVED2:M2';}
+		});
+
+		//common
+		var obj = new TEST.DRIVED2();
+		console.log(obj.a === 110);
+		console.log(obj.b === 20);
+		console.log(obj.c === 110);
+		console.log(obj.nd === 111);
+		console.log(obj.d() === 'DRIVED1::d');
+		console.log(obj.e() === 'DRIVED2::e');
+		console.log(obj.f() === 'BASE1::f');
+		console.log(obj.nf() === 'DRIVED2::nf');
+
+		// parent
+		console.log(obj.$PARENT('TEST.DRIVED1').classobj.classname === 'TEST.DRIVED1');
+		console.log(obj.$PARENT('TEST.BASE2').classobj.classname === 'TEST.BASE2');
+		console.log(obj.$PARENT('TEST.BASE1').classobj.classname === 'TEST.BASE1');
+		console.log(obj.$PARENT('XUIObject').classobj.classname === 'XUIObject');
+
+		console.log(obj.$PARENT('TEST.BASE2').c === 130);
+		console.log(obj.$PARENT('TEST.BASE1').c === 30);
+		console.log(obj.$PARENT('TEST.BASE2').d() === 'BASE2::d');
+		console.log(obj.$PARENT('TEST.BASE1').d() === 'BASE1::d');
+		console.log(obj.$PARENT('TEST.BASE2').e === undefined);
+		console.log(obj.$PARENT('TEST.BASE1').nd === undefined);
+
+		//polymorphism
+		console.log(obj.po1() === 'DRIVED2::e');
+		console.log(obj.po2() === 110);
+
+		console.log(obj.$PARENT('XUIObject').toString() === 'XUIObject: TEST.DRIVED2');
+
+		// parent modification
+		obj.$PARENT('TEST.BASE2').b = 'abc';
+		console.log(obj.$PARENT('TEST.DRIVED1').b === 'abc');
+		console.log(obj.b === 'abc');
+
+		obj.$PARENT('TEST.BASE1').c = 'def';
+		console.log(obj.$PARENT('TEST.DRIVED1').c === 130);
+
+		obj.$PARENT('TEST.BASE2').c = 'ghi';
+		console.log(obj.$PARENT('TEST.DRIVED1').c === 'ghi');
+		console.log(obj.c === 110);
+
+		obj.b = 'jkl';
+		console.log(obj.$PARENT('TEST.BASE1').b === 20);
+		console.log(obj.$PARENT('TEST.BASE2').b === 'jkl');
+
+		obj.md = 'gogogo';
+		console.log(obj.$PARENT('TEST.BASE1').md === 10);
+		console.log(obj.$PARENT('TEST.BASE2').md === 10);
+		console.log(obj.$PARENT('TEST.DRIVED1').md === 'gogogo');
+
+		obj.$PARENT('TEST.BASE2').md2 = 'alalal';
+		console.log(obj.md2 === 'alalal');
+
+
+		// private member
+		obj.setPrivate('mytest');
+		console.log(obj.$PARENT('TEST.BASE1').getPrivate() === 'mytest');
+		console.log(obj.$PARENT('TEST.DRIVED1').getPrivate() === 'mytest');
+
+		// static member
+		console.log(TEST.BASE1.D1 === 10);
+		console.log(TEST.BASE1.D2 === 20);
+		console.log(TEST.BASE1.M1() === 'TEST.BASE1:M1');
+		console.log(TEST.BASE1.M2() === 'TEST.BASE1:M2');
+
+		console.log(TEST.DRIVED1.D1 === 50);
+		console.log(TEST.DRIVED1.D2 === 20);
+		console.log(TEST.DRIVED1.M1() === 'TEST.DRIVED1:M1');
+		console.log(TEST.DRIVED1.M2() === 'TEST.BASE1:M2');
+
+		console.log(TEST.DRIVED2.D1 === 50);
+		console.log(TEST.DRIVED2.D2 === 110);
+		console.log(TEST.DRIVED2.M1() === 'TEST.DRIVED1:M1');
+		console.log(TEST.DRIVED2.M2() === 'TEST.DRIVED2:M2');
+
+		// static member modification
+		TEST.DRIVED2.MD = 'luck';
+		console.log(TEST.DRIVED1.MD === 'luck');
+		console.log(TEST.BASE2.MD === 10);
+
+		TEST.DRIVED2.MD2 = 'luck';
+		console.log(TEST.DRIVED1.MD2 === 'luck');
+		console.log(TEST.BASE2.MD2 === 'luck');
+
+	})
+	()
+	;
+
+
+
+
+	// Test XTextCanvasText
+	(function(){
+
+		var canvas2 = $('#test_canvas')[0];
+		var ctx = canvas2.getContext('2d');
+		
+
+		ctx.strokeRect(0, 0, 200, 200);
+		ctx.strokeRect(200, 0, 200, 200);
+		ctx.strokeRect(400, 0, 200, 200);
+		ctx.strokeRect(0, 200, 200, 200);
+		ctx.strokeRect(200, 200, 200, 200);
+		ctx.strokeRect(400, 200, 200, 200);
+		ctx.strokeRect(0, 400, 200, 200);
+		ctx.strokeRect(200, 400, 200, 200);
+		ctx.strokeRect(400, 400, 200, 200);
+
+		var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
+
+		var text = new UI.XTextCanvasText();
+		text.setText(str);
+		text.setFont('宋体', 12, UI.XTextCanvasText.Style.STYLE_ITALIC);
+		text.setColor('#FF0000');
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+			UI.XTextCanvasText.Align.ALIGN_START);
+		text.setDstRect(new UI.Rect(0, 0, 200, 200));
+		text.draw(ctx, new UI.Rect(0, 0, 200, 200));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+			UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+		text.setDstRect(new UI.Rect(200, 0, 400, 200));
+		text.draw(ctx, new UI.Rect(200, 0, 400, 200));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, 
+			UI.XTextCanvasText.Align.ALIGN_END);
+		text.setDstRect(new UI.Rect(400, 0, 600, 200));
+		text.draw(ctx, new UI.Rect(400, 0, 600, 200));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+			UI.XTextCanvasText.Align.ALIGN_START);
+		text.setDstRect(new UI.Rect(0, 200, 200, 400));
+		text.draw(ctx, new UI.Rect(0, 200, 200, 400));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+			UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+		text.setDstRect(new UI.Rect(200, 200, 400, 400));
+		text.draw(ctx, new UI.Rect(200, 200, 400, 400));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_MIDDLE, 
+			UI.XTextCanvasText.Align.ALIGN_END);
+		text.setDstRect(new UI.Rect(400, 200, 600, 400));
+		text.draw(ctx, new UI.Rect(400, 200, 600, 400));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+			UI.XTextCanvasText.Align.ALIGN_START);
+		text.setDstRect(new UI.Rect(0, 400, 200, 600));
+		text.draw(ctx, new UI.Rect(0, 400, 200, 600));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+			UI.XTextCanvasText.Align.ALIGN_MIDDLE);
+		text.setDstRect(new UI.Rect(200, 400, 400, 600));
+		text.draw(ctx, new UI.Rect(200, 400, 400, 600));
+
+		text.setAlignment(UI.XTextCanvasText.Align.ALIGN_END, 
+			UI.XTextCanvasText.Align.ALIGN_END);
+		text.setDstRect(new UI.Rect(400, 400, 600, 600));
+		text.draw(ctx, new UI.Rect(400, 400, 600, 600));
+
+		ctx.translate(0, 700);
+	})
+	()
+	;
+
+
+	// Test XCanvasText
+	(function(){
+
+		var canvas2 = $('#test_canvas')[0];
+		var ctx = canvas2.getContext('2d');
+
+		ctx.strokeRect(0, 0, 200, 200);
+		ctx.strokeRect(200, 0, 200, 200);
+		ctx.strokeRect(400, 0, 200, 200);
+		ctx.strokeRect(0, 200, 200, 200);
+		ctx.strokeRect(200, 200, 200, 200);
+		ctx.strokeRect(400, 200, 200, 200);
+		ctx.strokeRect(0, 400, 200, 200);
+		ctx.strokeRect(200, 400, 200, 200);
+		ctx.strokeRect(400, 400, 200, 200);
+
+
+		var str = "Angular JS (Angular.JS) 是一组用来开发Web页面的框架、模板以及数据绑定和丰富UI组件。它支持整个开发进程,提供web应用的架构,无需进行手工DOM操作";
+
+		var s = new UI.XCanvasText();
+		s.setFontSize(22);
+		s.draw(ctx, str, new UI.Rect(0, 0, 200, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_START);
+		s.draw(ctx, str, new UI.Rect(200, 0, 400, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_MIDDLE);
+		s.draw(ctx, str, new UI.Rect(400, 0, 600, 200), UI.XCanvasText.Align.ALIGN_START, UI.XCanvasText.Align.ALIGN_END);
+		s.draw(ctx, str, new UI.Rect(0, 200, 200, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_START);
+		s.draw(ctx, str, new UI.Rect(200, 200, 400, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_MIDDLE);
+		s.draw(ctx, str, new UI.Rect(400, 200, 600, 400), UI.XCanvasText.Align.ALIGN_MIDDLE, UI.XCanvasText.Align.ALIGN_END);
+		s.draw(ctx, str, new UI.Rect(0, 400, 200, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_START);
+		s.draw(ctx, str, new UI.Rect(200, 400, 400, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_MIDDLE);
+		s.draw(ctx, str, new UI.Rect(400, 400, 600, 600), UI.XCanvasText.Align.ALIGN_END, UI.XCanvasText.Align.ALIGN_END);
+
+
+		ctx.translate(0, 700);
+	})
+	()
+	;
+
+
+	// TestDraw9Part
+	(function(){
+
+		var canvas2 = $('#test_canvas')[0];
+		var ctx = canvas2.getContext('2d');
+
+		var img = new UI.XImageCanvasImage();
+
+		img.onImageLoaded(function(){
+			this.draw(ctx, new UI.Rect(50,50,750,750))
+			ctx.translate(0, 800);
+		});
+
+		img.load('@bgalpha.9.png');
+		img.setDstRect(new UI.Rect(50,50,750,750));
+
+	})
+	()
+	;
+
+
+	
+	
+
+	
+
+
+	
 
 </script>
