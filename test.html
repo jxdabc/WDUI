@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- meta http-equiv="Content-Type" content="text/html; charset=utf-8" -->
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
@@ -130,9 +130,9 @@
 
 		//polymorphism
 		console.log(obj.po1() === 'DRIVED2::e');
-		console.log(obj.po2() === 110);
+		console.log(obj.po2() === 30);
 
-		console.log(obj.$PARENT('XUIObject').toString() === 'XUIObject: TEST.DRIVED2');
+		console.log(obj.$PARENT('XUIObject').toString() === 'XUIObject: XUIObject');
 
 		// parent modification
 		obj.$PARENT('TEST.BASE2').b = 'abc';
@@ -191,7 +191,7 @@
 		console.log(TEST.BASE2.MD2 === 'luck');
 
 		TEST.DRIVED2.M3 = 'FailedToModify';
-		console.log(typeof TEST.DRIVED2.M3 == function);
+		console.log(typeof TEST.DRIVED2.M3 == 'function');
 
 	})
 	()
