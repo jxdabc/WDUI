@@ -12,11 +12,11 @@ $CLASS('XUIObject', function(me){
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function(){
-		return 'XUIObject: ' + me.classobj.classname;
+		return 'XUIObject: ' + me.$ME.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('getClassName', function(){
-		return me.classobj.classname;
+		return me.$ME.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('instanceOf', function(cls){
@@ -29,7 +29,7 @@ $CLASS('XUIObject', function(me){
 		if (typeof cls != "function")
 			return false;
 
-		var c = me.classobj;
+		var c = me.$ME.classobj;
 
 		return isCls1DerivedClassOfCls2(c, cls);	
 	});

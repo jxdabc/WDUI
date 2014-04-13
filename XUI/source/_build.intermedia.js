@@ -10432,7 +10432,7 @@ String.prototype.format = function()
 				v.apply(global, 
 					[extend_list_with_args].concat(Array.prototype.slice.call(my_arguments, 0)));
 			});
-			buildParent(this, extend_list, extend_list_with_args);
+			var parent_list = buildParent(this, extend_list, extend_list_with_args);
 
 			// Member initialization. 
 			$.each(object_info.public_var_list || [], function(i,v){
@@ -10449,10 +10449,58 @@ String.prototype.format = function()
 				});
 			});
 
+			// $ME reference definition. 
+			var real_obj = this;
+			Object.defineProperty(this, '$ME', 
+			{
+				enumerable : false,
+				configurable : false,
+				set: function (val) 
+				{
+					real_obj = val;
+					$.each(parent_list, function(i,v){
+						v.obj.$ME = val;
+					});
+				},
+				get: function () 
+				{
+					return real_obj;			
+				}
+			});
+
+			// polymorphism_obj definition. 
+			$.each(this, function(i,v){
+				if (!me.hasOwnProperty(i)) return;
+				if (typeof v != "function")
+					makeReference(polymorphism_obj, i, me, i);
+				else
+				{
+					Object.defineProperty(polymorphism_obj, i, 
+					{
+						enumerable : true,
+						configurable : false,
+						set: function (val) 
+						{
+							me.$ME[i] = val;
+						},
+						get: function () 
+						{
+							return me.$ME[i];
+						}
+					});
+				}
+
+				makeReference(polymorphism_obj, '$ME', me, '$ME');
+				makeReference(polymorphism_obj, '$PARENT', me, '$PARENT');
+			});
+
 			// Self construction. 
 			$.each(object_info.constructor_list || [], function(i,v){
 				v.apply(global, my_arguments);
 			});
+
+			// $ME reference initialization. 
+			this.$ME = this;
 
 			return this;
 		}
@@ -10577,24 +10625,7 @@ String.prototype.format = function()
 			}
 		});
 
-		var real_obj;
-		Object.defineProperty(object, '$ME', 
-		{
-			enumerable : false,
-			configurable : false,
-			set: function (val) 
-			{
-				real_obj = val;
-				$.each(parent_list, function(i,v){
-					v.obj.$ME = val;
-				});
-			},
-			get: function () 
-			{
-				return real_obj;			
-			}
-		});
-		object.$ME = object;
+		return parent_list;
 	}
 
 
@@ -10665,11 +10696,11 @@ $CLASS('XUIObject', function(me){
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function(){
-		return 'XUIObject: ' + me.classobj.classname;
+		return 'XUIObject: ' + me.$ME.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('getClassName', function(){
-		return me.classobj.classname;
+		return me.$ME.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('instanceOf', function(cls){
@@ -10682,7 +10713,7 @@ $CLASS('XUIObject', function(me){
 		if (typeof cls != "function")
 			return false;
 
-		var c = me.classobj;
+		var c = me.$ME.classobj;
 
 		return isCls1DerivedClassOfCls2(c, cls);	
 	});
