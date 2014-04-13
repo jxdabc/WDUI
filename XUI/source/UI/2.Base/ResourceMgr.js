@@ -2,32 +2,29 @@
 
 (function(){
 
-	$CLASS('UI.XResourceMgr', function(){
+	$CLASS('UI.XResourceMgr', function(me){
 
-	
-		$PUBLIC({
-			'addSearchPath' : addSearchPath,
-			'getResourcePath' : getResourcePath
-		});
-
-		$CONSTRUCTOR(function(){
-			addSearchPath('default_skin_package');
-		});
+		$PUBLIC_FUN([
+			'addSearchPath',
+			'getResourcePath'
+		]);
 
 		var m_search_path = [];
 
-		function addSearchPath(path) {
+		$CONSTRUCTOR(function(){
+			me.addSearchPath('default_skin_package');
+		});
+	
+		$PUBLIC_FUN_IMPL('addSearchPath', function(path) {
 			path = trimLastSlash(path);
 			for (var i = 0; i < m_search_path.length; i++)
 				if (m_search_path[i] == path)
 					return;
 			m_search_path.push(path);
-		}
+		});
 
-		function getResourcePath(path, callback) {
-
+		$PUBLIC_FUN_IMPL('getResourcePath', function(path, callback) {
 			// callback(path)
-
 			var requests = [];
 			for (var i = 0; i < m_search_path.length; i++) {
 				var info = {};
@@ -63,8 +60,7 @@
 					}		
 				}
 			}
-
-		}
+		});
 
 		function trimLastSlash(path) {
 			if (path.substr(path.length - 1) == '/')

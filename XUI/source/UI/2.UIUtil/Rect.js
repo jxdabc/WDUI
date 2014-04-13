@@ -2,26 +2,28 @@
 
 $CLASS('UI.Rect', function(me){
 
-	$PUBLIC({
+	$PUBLIC_FUN([
+		'width',
+		'height',
+		'leftTop',
+		'rightBottom',
+		'area',
+		'isEmpty',
+
+		'equals',
+
+		'intersect',
+
+		'offset',
+
+		'toString'
+	]);
+
+	$PUBLIC_VAR({
 		'left' : 0,
 		'top' : 0,
 		'right' : 0,
-		'bottom' : 0,
-
-		'width' 		: width,
-		'height' 		: height,
-		'leftTop' 		: leftTop,
-		'rightBottom' 	: rightBottom,
-		'area' 			: area,
-		'isEmpty' 		: isEmpty,
-
-		'equals' 		: equals,
-
-		'intersect' 	: intersect,
-
-		'offset' 		: offset,
-
-		'toString'      : toString
+		'bottom' : 0
 	});
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
@@ -59,17 +61,34 @@ $CLASS('UI.Rect', function(me){
 		me.bottom = bottom;
 	});
 
-	function width () { return me.right - me.left; }
-	function height () { return me.bottom - me.top; }
-	function equals (rc) {
+	$PUBLIC_FUN_IMPL('width', function  () { return me.right - me.left; });
+	$PUBLIC_FUN_IMPL('height',function  () { return me.bottom - me.top; } );
+	
+	$PUBLIC_FUN_IMPL('leftTop', function () {
+		return new UI.Pt(me.left, me.top);
+	});
+
+	$PUBLIC_FUN_IMPL('rightBottom', function () {
+		return new UI.Pt(me.right, me.bottom);
+	});
+
+	$PUBLIC_FUN_IMPL('area', function  () {
+		return (me.bottom - me.top) * (me.right - me.left);
+	});
+
+	$PUBLIC_FUN_IMPL('isEmpty', function () {
+		return me.bottom <= me.top || me.right <= me.left;
+	});
+
+	$PUBLIC_FUN_IMPL('equals', function (rc) {
 		return me.top == rc.top &&
 			me.bottom == rc.bottom &&
 			me.left == rc.left &&
 			me.right == rc.right;
-	}
-	function intersect (rc) {
-		var new_rect = new UI.Rect();
+	});
 
+	$PUBLIC_FUN_IMPL('intersect', function (rc) {
+		var new_rect = new UI.Rect();
 		do 
 		{
 			new_rect.top = Math.max(me.top, rc.top);
@@ -85,23 +104,9 @@ $CLASS('UI.Rect', function(me){
 		} while (false);
 
 		return new UI.Rect();	
-	}
-	function area () {
-		return (me.bottom - me.top) * (me.right - me.left);
-	}
-	function isEmpty() {
-		return me.bottom <= me.top || me.right <= me.left;
-	}
+	});
 
-	function leftTop() {
-		return new UI.Pt(me.left, me.top);
-	}
-
-	function rightBottom() {
-		return new UI.Pt(me.right, me.bottom);
-	}
-
-	function offset(x, y) {
+	$PUBLIC_FUN_IMPL('offset', function (x, y) {
 
 		if (x.instanceOf && x.instanceOf(UI.Pt)) {
 			var pt = x;
@@ -113,11 +118,10 @@ $CLASS('UI.Rect', function(me){
 		me.top += y;
 		me.right += x;
 		me.bottom += y;
-	}
+	});
 
-	function toString() {
+	$PUBLIC_FUN_IMPL('toString', function () {
 		return "left:%, top:%, right:%, bottom:%"
 			.format(me.left, me.top, me.right, me.bottom);
-	}
-
+	});
 });

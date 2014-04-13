@@ -2,13 +2,32 @@
 
 $CLASS('UI.XImageCanvasImage', 
 $EXTENDS(UI.IXImage),
-function(me){
+function(me, SELF){
+
+	$PUBLIC_FUN([
+		'load',
+
+		'setSrcRect',
+		'setDstRect',
+		'setDrawType',
+		'setPartRect',
+		'setAlpha',
+
+		'getImageWidth',
+		'getImageHeight',
+
+		'draw',
+
+		'onImageLoaded',
+		'offImageLoaded'
+	]);
+
 
 	var m_img;
 	var m_buffer;
 
 	var m_draw_type = 
-		UI.XImageCanvasImage.DrawType.DIT_NORMAL;
+		SELF.DrawType.DIT_NORMAL;
 	var m_formatted_img;
 	var m_alpha = 255;
 
@@ -24,25 +43,7 @@ function(me){
 	var m_image_loaded_listener = [];
 
 
-	$PUBLIC({
-		'load' : load,
-
-		'setSrcRect'  : setSrcRect,
-		'setDstRect'  : setDstRect,
-		'setDrawType' : setDrawType,
-		'setPartRect' : setPartRect,
-		'setAlpha' : setAlpha,
-
-		'getImageWidth' : getImageWidth,
-		'getImageHeight' : getImageHeight,
-
-		'draw' : draw,
-
-		'onImageLoaded' : onImageLoaded,
-		'offImageLoaded' : offImageLoaded
-	});
-
-	function load(path) {
+	$PUBLIC_FUN_IMPL('load', function (path) {
 
 		m_unloaded_src_rect = 
 		m_unloaded_part_rect = 
@@ -53,7 +54,107 @@ function(me){
 			loadAsResource(path.substr(1));
 		else 
 			loadImageObject(path);
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('setSrcRect', function (rc) {
+
+		if (!m_loaded) {
+			m_unloaded_src_rect = rc;
+			return;
+		}
+
+		if (m_src_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_src_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setDstRect', function (rc) {
+		if (m_dst_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_dst_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setDrawType',	function (type) {
+
+		if (!m_loaded) {
+			m_unloaded_draw_type = type;
+			return;
+		}
+
+		if (m_draw_type == type)
+			return;
+
+		releaseBuffer();
+		m_draw_type = type;
+	});
+
+	$PUBLIC_FUN_IMPL('setPartRect', function (rc) {
+
+		if (!m_loaded) {
+			m_unloaded_part_rect = rc;
+			return;
+		}
+
+		if (m_part_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_part_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setAlpha', function (alpha) {
+		m_alpha = alpha;
+	});
+
+	$PUBLIC_FUN_IMPL('getImageWidth', function () {
+		if (!m_loaded) return 0;
+		return m_img.getWidth();
+	});
+	$PUBLIC_FUN_IMPL('getImageHeight', function () {
+		if (!m_loaded) return 0;
+		return m_img.getHeight();
+	});
+
+	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
+		
+		if (!m_loaded) return;
+
+		if (!m_buffer) refreshBuffer();
+
+		var dst_to_draw_real =
+			rect_to_draw.intersect(m_dst_rect);
+
+		if (dst_to_draw_real.isEmpty()) return;
+
+		var src_to_draw_real = 
+			new UI.Rect(dst_to_draw_real);
+		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
+
+		ctx.save();
+		ctx.globalAlpha = m_alpha;
+		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
+		ctx.restore();
+	});
+
+	$PUBLIC_FUN_IMPL('onImageLoaded', function (fn) {
+		m_image_loaded_listener.push(fn);
+	});
+
+	$PUBLIC_FUN_IMPL('offImageLoaded', function (fn) {
+		var index = m_image_loaded_listener.indexOf(fn);
+		if (index == -1) return;
+		m_image_loaded_listener.splice(index, 1);
+	});
+
+
+
 
 	function loadAsResource(path) { 
 		var mgr = UI.XResourceMgr.instance();
@@ -105,19 +206,19 @@ function(me){
 
 		switch (m_draw_type)
 		{
-			case UI.XImageCanvasImage.DrawType.DIT_NORMAL: 
+			case SELF.DrawType.DIT_NORMAL: 
 				drawNormal(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_STRETCH:  
+			case SELF.DrawType.DIT_STRETCH:  
 				drawStretch(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_9PART: 
+			case SELF.DrawType.DIT_9PART: 
 				draw9Part(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_3PARTH: 
+			case SELF.DrawType.DIT_3PARTH: 
 				draw3PartH(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_3PARTV: 
+			case SELF.DrawType.DIT_3PARTV: 
 				draw3PartV(m_buffer.getContext('2d')); 
 				break;
 		}
@@ -206,11 +307,11 @@ function(me){
 	function loadFormattedImageInfo() {
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_NORMAL;
+			m_draw_type = SELF.DrawType.DIT_NORMAL;
 		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_STRETCH;
+			m_draw_type = SELF.DrawType.DIT_STRETCH;
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_9PART;
+			m_draw_type = SELF.DrawType.DIT_9PART;
 			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
 			else loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
@@ -284,102 +385,6 @@ function(me){
 		return r << 24 | g << 16 | b << 8 | a;
 	}
 
-	function getImageWidth() {
-		if (!m_loaded) return 0;
-		return m_img.getWidth();
-	}
-
-	function getImageHeight() {
-		if (!m_loaded) return 0;
-		return m_img.getHeight();
-	}
-
-	function setSrcRect(rc) {
-
-		if (!m_loaded) {
-			m_unloaded_src_rect = rc;
-			return;
-		}
-
-		if (m_src_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_src_rect = rc;
-	}
-
-	function setDstRect(rc) {
-		if (m_dst_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_dst_rect = rc;
-	}
-
-	function setDrawType(type) {
-
-		if (!m_loaded) {
-			m_unloaded_draw_type = type;
-			return;
-		}
-
-		if (m_draw_type == type)
-			return;
-
-		releaseBuffer();
-		m_draw_type = type;
-	} 
-
-	function setPartRect(rc) {
-
-		if (!m_loaded) {
-			m_unloaded_part_rect = rc;
-			return;
-		}
-
-		if (m_part_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_part_rect = rc;
-	}
-
-	function setAlpha(alpha) {
-		m_alpha = alpha;
-	}
-
-	function draw(ctx, rect_to_draw) {
-		
-		if (!m_loaded) return;
-
-		if (!m_buffer) refreshBuffer();
-
-		var dst_to_draw_real =
-			rect_to_draw.intersect(m_dst_rect);
-
-		if (dst_to_draw_real.isEmpty()) return;
-
-		var src_to_draw_real = 
-			new UI.Rect(dst_to_draw_real);
-		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
-
-		ctx.save();
-		ctx.globalAlpha = m_alpha;
-		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
-		ctx.drawImage(m_buffer, 
-			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
-			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
-		ctx.restore();
-	}
-
-	function onImageLoaded(fn) {
-		m_image_loaded_listener.push(fn);
-	}
-
-	function offImageLoaded(fn) {
-		var index = m_image_loaded_listener.indexOf(fn);
-		if (index == -1) return;
-		m_image_loaded_listener.splice(index, 1);
-	}
+	
 
 });

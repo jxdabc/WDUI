@@ -10362,13 +10362,13 @@ String.prototype.format = function()
 }
 ;
 
-(function(){
+(function(global){
 
 	var object_info_stack = [];
 
 	var static_inheritance_ignore_list = ['empty_obj_factory', 'classname', 'parent_classes', '$STATIC'];
 
-	window.$CLASS = function(name, extend_list, scope) {
+	global.$CLASS = function(name, extend_list, scope) {
 
 		/* overload function(name, scope) */
 
@@ -10380,7 +10380,7 @@ String.prototype.format = function()
 
 		extend_list = extend_list || [];
 		if (name != 'XUIObject' && !extend_list.length)
-			extend_list.push(window.XUIObject);
+			extend_list.push(global.XUIObject);
 
 		addObject(name, factory);
 
@@ -10397,19 +10397,7 @@ String.prototype.format = function()
 				if (!parent.hasOwnProperty(i)) return;
 				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
 				// console.log(i);
-				Object.defineProperty(factory, i, 
-				{
-					enumerable : true,
-					configurable : true,
-					set: function (val) 
-					{
-						parent[i] = val;
-					},
-					get: function () 
-					{
-						return parent[i];
-					}
-				});
+				makeReference(factory, i, parent, i);
 			});
 		});
 
@@ -10424,13 +10412,15 @@ String.prototype.format = function()
 			var me = this;
 			var my_arguments = arguments;
 
-			$.each(this, function(i, v){
-				if (!me.hasOwnProperty(i)) return;
-				throw new Exception('XUIClass::ONE', 'XUIClass: Object to be constructed is not empty. ');
-			});
+			// $.each(this, function(i, v){
+			// 	if (!me.hasOwnProperty(i)) return;
+			// 	throw new Exception('XUIClass::ONE', 'XUIClass: Object to be constructed is not empty. ');
+			// });
+
+			var polymorphism_obj = new empty_obj_factory();
 
 			object_info_stack.push({});
-			scope(this);
+			scope(polymorphism_obj, factory);
 			var object_info = object_info_stack.pop();
 
 			// Parent construction. 
@@ -10439,26 +10429,29 @@ String.prototype.format = function()
 				extend_list_with_args[v.classname] = [];
 			});
 			$.each(object_info.parent_constructor_list || [], function(i,v){
-				v.apply(me, 
+				v.apply(global, 
 					[extend_list_with_args].concat(Array.prototype.slice.call(my_arguments, 0)));
 			});
-			addParentObject(this, extend_list, extend_list_with_args);
+			buildParent(this, extend_list, extend_list_with_args);
 
 			// Member initialization. 
-			$.each(object_info.public_list || [], function(i,v){
+			$.each(object_info.public_var_list || [], function(i,v){
 				$.each(v, function(ii,vv){
-					Object.defineProperty(me, ii, {
-						enumerable : true,
-						configurable : true,
-						writable : true,
-						value : vv
-					});
+					makeProperty(me, ii, vv, true);
+				});
+			});
+			$.each(object_info.public_fun_list || [], function(i,v){
+				$.each(v, function(ii,vv){
+					if (!object_info.public_fun_impl_map[vv])
+						throw new Exception('XUIClass::PFNI', 
+							'XUIClass: Public function ' + vv + ' not implemented. ');
+					makeProperty(me, vv, object_info.public_fun_impl_map[vv], false);
 				});
 			});
 
 			// Self construction. 
 			$.each(object_info.constructor_list || [], function(i,v){
-				v.apply(me, my_arguments);
+				v.apply(global, my_arguments);
 			});
 
 			return this;
@@ -10466,109 +10459,157 @@ String.prototype.format = function()
 
 		return factory;
 	}
+	
 
-	function addParentObject(object, extend_list, extend_list_with_args) {
+	global.$EXTENDS = function(/* parent1, parent2, parent3, ... , parentN */) {
+		return Array.prototype.slice.call(arguments, 0);
+	}
+
+	global.$PUBLIC_VAR = function(list) {
+		var info = object_info_stack.last();
+		info.public_var_list = info.public_var_list || [];
+		info.public_var_list.push(list);
+	}
+
+	global.$PUBLIC_FUN = function(list) {
+
+		if (list.constructor != global.Array) {
+			var fun_list = [];
+			$.each(list, function(i,v){
+				fun_list.push(i);
+				global.$PUBLIC_FUN_IMPL(i, v);
+			});
+			global.$PUBLIC_FUN(fun_list);
+
+			return;
+		}
+
+		var info = object_info_stack.last();
+		info.public_fun_list = info.public_fun_list || [];
+		info.public_fun_list.push(list);
+	}
+
+	global.$PUBLIC_FUN_IMPL = function(name, fun) {
+		var info = object_info_stack.last();
+		info.public_fun_impl_map = info.public_fun_impl_map || {};
+		info.public_fun_impl_map[name] = fun;
+	}
+
+	global.$PARENT_CONSTRUCTOR = function(fn) {
+		var info = object_info_stack.last();
+		info.parent_constructor_list = info.parent_constructor_list || [];
+		info.parent_constructor_list.push(fn);
+	}
+
+	global.$CONSTRUCTOR = function(fn) {
+		var info = object_info_stack.last();
+		info.constructor_list = info.constructor_list || [];
+		info.constructor_list.push(fn);
+	}
+
+	global.$ABSTRACT = function() { 
+		throw new Exception('XUIClass::AFNI', 
+			'Abstract funtion not implemented. '); 
+	}
+
+	global.$ENUM = function(classname, value_list) {
+		var classobj = $CLASS(classname, function(me){
+
+			$PUBLIC_VAR({
+				'name' : ''
+			});
+
+			$CONSTRUCTOR(function(name){
+				me.name = name;
+			});
+		});
+
+		var global_list = {};
+
+		if (value_list.constructor == Array)
+			$.each(value_list, function(i,v){
+				global_list[v] = new classobj(v);
+			});
+		else 
+			$.each(value_list, function(i,v){
+				global_list[i] = v;
+			});
+
+		classobj.$STATIC(global_list);
+	}
+
+	function buildParent(object, extend_list, extend_list_with_args) {
 
 		var parent_list =[];
 
 		$.each(extend_list || [], function(i,v){
-
 			var name = v.classname;
 			var parent = new v.empty_obj_factory();
 			parent_list.push({'name' : name, 'obj' : parent});
-			
-			v.apply(object, extend_list_with_args[name] || []);
-			$.each(object, function(i,v){
-				if (!object.hasOwnProperty(i)) return;
-				Object.defineProperty(parent, i, 
-					Object.getOwnPropertyDescriptor(object, i));
-				delete object[i];
-			});
+			v.apply(parent, extend_list_with_args[name] || []);
 		});
 
 		$.each(parent_list, function(i,v){
 			var parent = v.obj;
 			$.each(parent, function(i,v){
 				if (!parent.hasOwnProperty(i)) return;
-				if (i == '$PARENT') return;
-				Object.defineProperty(object, i, 
-				{
-					enumerable : true,
-					configurable : true,
-					set: function (val) 
-					{
-						parent[i] = val;
-					},
-					get: function () 
-					{
-						return parent[i];
-					}
-				});
+				makeReference(object, i, parent, i);
 			});
 		});
 
-		object.$PARENT = function (name) {
+		Object.defineProperty(object, '$PARENT', {
+			enumerable : false,
+			configurable : false,
+			writable : false,
+			value : function (name) {
+				var direct_parent = null;
+				$.each(parent_list, function(i,v){
+					if (direct_parent) return;
+					if (v.name == name) direct_parent = v.obj;
+				});
+				if (direct_parent) return direct_parent;
+				var rst = null;
+				$.each(parent_list, function(i,v){
+					if (rst) return;
+					rst = v.obj.$PARENT(name);
+				});
+				return rst;
+			}
+		});
 
-			var direct_parent = null;
-			$.each(parent_list, function(i,v){
-				if (direct_parent) return;
-				if (v.name == name) direct_parent = v.obj;
-			});
-			if (direct_parent) return direct_parent;
-			var rst = null;
-			$.each(parent_list, function(i,v){
-				if (rst) return;
-				rst = v.obj.$PARENT(name);
-			});
-
-			return rst;
-		}
-	}
-
-	window.$EXTENDS = function(/* parent1, parent2, parent3, ... , parentN */) {
-		return Array.prototype.slice.call(arguments, 0);
-	}
-
-	window.$PUBLIC = function(list) {
-		var info = object_info_stack.last();
-		info.public_list = info.public_list || [];
-		info.public_list.push(list);
-	}
-
-	window.$PARENT_CONSTRUCTOR = function(fn) {
-		var info = object_info_stack.last();
-		info.parent_constructor_list = info.parent_constructor_list || [];
-		info.parent_constructor_list.push(fn);
-	}
-
-	window.$CONSTRUCTOR = function(fn) {
-		var info = object_info_stack.last();
-		info.constructor_list = info.constructor_list || [];
-		info.constructor_list.push(fn);
-	}
-
-	window.$ABSTRACT = function() { 
-		throw new Exception('XUIClass::AFNI', 
-			'Abstract funtion not implemented. '); 
+		var real_obj;
+		Object.defineProperty(object, '$ME', 
+		{
+			enumerable : false,
+			configurable : false,
+			set: function (val) 
+			{
+				real_obj = val;
+				$.each(parent_list, function(i,v){
+					v.obj.$ME = val;
+				});
+			},
+			get: function () 
+			{
+				return real_obj;			
+			}
+		});
+		object.$ME = object;
 	}
 
 
 	function dealWithStatic(list) {
 		var me = this;
 		$.each(list, function(i,v){
-			Object.defineProperty(me, i, {
-				enumerable : true,
-				configurable : true,
-				writable : true,
-				value : v
-			});
+			makeProperty(me, i, v, 
+				typeof v != "function");
 		});
 	}
 
 
 	function addObject(name, object) {
 		name = name.split('.');
-		var c = window;
+		var c = global;
 		var c_name = '';
 		for (var i = 0; i < name.length - 1; i++) {
 			c_name += name[i];
@@ -10582,31 +10623,56 @@ String.prototype.format = function()
 		c[name.last()] = object;
 	}
 
-})();
+	function makeReference(obj, name, target_obj, target_name) {
+		Object.defineProperty(obj, name, 
+		{
+			enumerable : true,
+			configurable : true,
+			set: function (val) 
+			{
+				target_obj[target_name] = val;
+			},
+			get: function () 
+			{
+				return target_obj[target_name];
+			}
+		});
+	}
+
+	function makeProperty(obj, name, value, writable) {
+		Object.defineProperty(obj, name, {
+			enumerable : true,
+			configurable : true,
+			writable : writable,
+			value : value
+		});
+	}
+
+})(window);
 
 
 ;
 
 $CLASS('XUIObject', function(me){
 
-	$PUBLIC({
-		'toString' : toString,
-		'getClassName' : getClassName,
-		'instanceOf' : instanceOf
-	});
+	$PUBLIC_FUN([
+		'toString',
+		'getClassName',
+		'instanceOf'
+	]);
 
 	$CONSTRUCTOR(function(){
 	});
 
-	function toString() {
+	$PUBLIC_FUN_IMPL('toString', function(){
 		return 'XUIObject: ' + me.classobj.classname;
-	}
+	});
 
-	function getClassName() {
+	$PUBLIC_FUN_IMPL('getClassName', function(){
 		return me.classobj.classname;
-	}
+	});
 
-	function instanceOf(cls) {
+	$PUBLIC_FUN_IMPL('instanceOf', function(cls){
 		if (typeof cls == "string") {
 			try {
 				cls = eval(cls);
@@ -10618,8 +10684,8 @@ $CLASS('XUIObject', function(me){
 
 		var c = me.classobj;
 
-		return isCls1DerivedClassOfCls2(c, cls);		
-	}
+		return isCls1DerivedClassOfCls2(c, cls);	
+	});
 
 	function isCls1DerivedClassOfCls2(cls1, cls2) {
 		if (cls1 == cls2) return true;
@@ -10685,7 +10751,7 @@ $CLASS('UI', function(){});
 
 $CLASS('UI.Size', function(me){
 
-	$PUBLIC({
+	$PUBLIC_VAR({
 		'w' : 0,
 		'h' : 0
 	});
@@ -10706,26 +10772,28 @@ $CLASS('UI.Size', function(me){
 
 $CLASS('UI.Rect', function(me){
 
-	$PUBLIC({
+	$PUBLIC_FUN([
+		'width',
+		'height',
+		'leftTop',
+		'rightBottom',
+		'area',
+		'isEmpty',
+
+		'equals',
+
+		'intersect',
+
+		'offset',
+
+		'toString'
+	]);
+
+	$PUBLIC_VAR({
 		'left' : 0,
 		'top' : 0,
 		'right' : 0,
-		'bottom' : 0,
-
-		'width' 		: width,
-		'height' 		: height,
-		'leftTop' 		: leftTop,
-		'rightBottom' 	: rightBottom,
-		'area' 			: area,
-		'isEmpty' 		: isEmpty,
-
-		'equals' 		: equals,
-
-		'intersect' 	: intersect,
-
-		'offset' 		: offset,
-
-		'toString'      : toString
+		'bottom' : 0
 	});
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
@@ -10763,17 +10831,34 @@ $CLASS('UI.Rect', function(me){
 		me.bottom = bottom;
 	});
 
-	function width () { return me.right - me.left; }
-	function height () { return me.bottom - me.top; }
-	function equals (rc) {
+	$PUBLIC_FUN_IMPL('width', function  () { return me.right - me.left; });
+	$PUBLIC_FUN_IMPL('height',function  () { return me.bottom - me.top; } );
+	
+	$PUBLIC_FUN_IMPL('leftTop', function () {
+		return new UI.Pt(me.left, me.top);
+	});
+
+	$PUBLIC_FUN_IMPL('rightBottom', function () {
+		return new UI.Pt(me.right, me.bottom);
+	});
+
+	$PUBLIC_FUN_IMPL('area', function  () {
+		return (me.bottom - me.top) * (me.right - me.left);
+	});
+
+	$PUBLIC_FUN_IMPL('isEmpty', function () {
+		return me.bottom <= me.top || me.right <= me.left;
+	});
+
+	$PUBLIC_FUN_IMPL('equals', function (rc) {
 		return me.top == rc.top &&
 			me.bottom == rc.bottom &&
 			me.left == rc.left &&
 			me.right == rc.right;
-	}
-	function intersect (rc) {
-		var new_rect = new UI.Rect();
+	});
 
+	$PUBLIC_FUN_IMPL('intersect', function (rc) {
+		var new_rect = new UI.Rect();
 		do 
 		{
 			new_rect.top = Math.max(me.top, rc.top);
@@ -10789,23 +10874,9 @@ $CLASS('UI.Rect', function(me){
 		} while (false);
 
 		return new UI.Rect();	
-	}
-	function area () {
-		return (me.bottom - me.top) * (me.right - me.left);
-	}
-	function isEmpty() {
-		return me.bottom <= me.top || me.right <= me.left;
-	}
+	});
 
-	function leftTop() {
-		return new UI.Pt(me.left, me.top);
-	}
-
-	function rightBottom() {
-		return new UI.Pt(me.right, me.bottom);
-	}
-
-	function offset(x, y) {
+	$PUBLIC_FUN_IMPL('offset', function (x, y) {
 
 		if (x.instanceOf && x.instanceOf(UI.Pt)) {
 			var pt = x;
@@ -10817,19 +10888,18 @@ $CLASS('UI.Rect', function(me){
 		me.top += y;
 		me.right += x;
 		me.bottom += y;
-	}
+	});
 
-	function toString() {
+	$PUBLIC_FUN_IMPL('toString', function () {
 		return "left:%, top:%, right:%, bottom:%"
 			.format(me.left, me.top, me.right, me.bottom);
-	}
-
+	});
 });
 ;
 
 $CLASS('UI.Pt', function(me){
 
-	$PUBLIC({
+	$PUBLIC_VAR({
 		'x' : 0,
 		'y' : 0
 	});
@@ -10848,29 +10918,38 @@ $CLASS('UI.Pt', function(me){
 });
 ;
 
-$CLASS('XFrame', function(me){
+$CLASS('UI.XFrame', function(me, SELF){
 
 
-	$PUBLIC({
-		'setName' 			: setName,
-		'getName' 			: getName,
-		'getFrameByName'	: getFrameByName,
-		'getFrmaesByName'	: getFramesByName
-	});
+	$PUBLIC_FUN([
+		'setName',
+		'getName',
+		'getFrameByName',
+		'getFrmaesByName',
+
+		'create',
+
+		'generateLayoutParam',
+		'beginUpdateLayoutParam',
+		'endUpdateLayoutParam',
+		'isLayouting',
+		'invalidateLayout'
+	]);
+
+	var m_parent = null;
+
+	var m_layout_param 			= null;
+	var m_delay_layout_param 	= null;
 
 
 	var m_name = null;
 	var m_child_frames = [];
 
-	function setName(name) {
-		m_name = name; 
-	}
-
-	function getName(name) {
+	$PUBLIC_FUN_IMPLE('setName', function(){
 		return m_name;
-	}
+	});
 
-	function getFrameByName(name) {
+	$PUBLIC_FUN_IMPLE('getFrameByName', function(){
 		if (m_name == name) return me;
 
 		for (var i = 0; i < m_child_frames.length; i++) {
@@ -10879,10 +10958,9 @@ $CLASS('XFrame', function(me){
 		}
 
 		return null;
-	}
+	});
 
-	function getFramesByName(name) {
-		
+	$PUBLIC_FUN_IMPLE('getFramesByName', function(){
 		var rst = [];
 
 		if (m_name == name) rst.push(me);
@@ -10892,41 +10970,145 @@ $CLASS('XFrame', function(me){
 		});
 
 		return rst;
+	});
+
+
+	function create(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
+		visibility = visibility || UI.XFrame.Visibility.VISIBILITY_NONE;
+
+		beginUpdateLayoutParam(layout);
+		endUpdateLayoutParam();
+
+		setParent(parent);
+
+		setVisibility(visibility);
+	}
+
+	function beginUpdateLayoutParam() {
+		if (isLayouting()) {
+			if (!m_delay_layout_param)
+				m_delay_layout_param = me.generateLayoutParam(m_layout_param);
+			return m_delay_layout_param;
+		} else {
+			if (!m_layout_param)
+				m_layout_param = me.generateLayoutParam();
+			return m_layout_param;
+		}
+	}
+
+	function endUpdateLayoutParam() {
+		// TODO: delay layout part. 
+
+		if (m_parent) m_parent.invalidateLayout();
+	}
+
+	function isLayouting() {
+		if (m_parent)
+			return m_parent.isLayouting();
+
+		return false;
+	}
+
+	function invalidateLayout() {
+
 	}
 
 
+	function generateLayoutParam(copy_from_or_xml_or_null) {
+		
+		if (!copy_from_or_xml_or_null)
+			return new SELF.LayoutParam();
+
+		if (copy_from_or_xml_or_null.instanceOf &&
+			copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
+			var copy_from = copy_from_or_xml_or_null;
+			return new SELF.LayoutParam(copy_from);			
+		}	
+
+		// TODO : XML part
+	}
 
 });
+
+$ENUM('UI.XFrame.Visibility', 
+[
+	'VISIBILITY_NONE',
+	'VISIBILITY_HIDE',
+	'VISIBILITY_SHOW'
+]);
+
+$CLASS('UI.XFrame.LayoutParam', function(me, SELF){
+
+
+	var public_list = {
+		'x' 		: 0,
+		'y' 		: 0,
+		'width' 	: 0,
+		'height'	: 0,
+	
+		'margin_left'		: 0,
+		'margin_top'		: 0,
+		'margin_right'		: 0,
+		'margin_bottom'		: 0
+	};
+
+	$PUBLIC(public_list);
+
+
+	$CONSTRUCTOR(function(xml_or_layout_param){
+
+		if (!xml_or_layout_param) return;
+
+		if (xml_or_layout_param.instanceOf &&
+			xml_or_layout_param.instanceOf(SELF)) {
+
+			var other = xml_or_layout_param;
+			if (other.classobj != SELF)
+				other = other.$PARENT(SELF.classname);
+
+			$.each(public_list, function(i,v){
+				me[i] = other[i];
+			});
+		}	
+
+		// TODO: XML part
+	});
+
+
+});
+
+$ENUM('UI.XFrame.LayoutParam.SpecialMetrics', 
+[
+	'METRIC_REACH_PARENT',
+	'METRIC_WRAP_CONTENT'
+]);
 ;
 
 (function(){
 
-	$CLASS('UI.XResourceMgr', function(){
+	$CLASS('UI.XResourceMgr', function(me){
 
-	
-		$PUBLIC({
-			'addSearchPath' : addSearchPath,
-			'getResourcePath' : getResourcePath
-		});
-
-		$CONSTRUCTOR(function(){
-			addSearchPath('default_skin_package');
-		});
+		$PUBLIC_FUN([
+			'addSearchPath',
+			'getResourcePath'
+		]);
 
 		var m_search_path = [];
 
-		function addSearchPath(path) {
+		$CONSTRUCTOR(function(){
+			me.addSearchPath('default_skin_package');
+		});
+	
+		$PUBLIC_FUN_IMPL('addSearchPath', function(path) {
 			path = trimLastSlash(path);
 			for (var i = 0; i < m_search_path.length; i++)
 				if (m_search_path[i] == path)
 					return;
 			m_search_path.push(path);
-		}
+		});
 
-		function getResourcePath(path, callback) {
-
+		$PUBLIC_FUN_IMPL('getResourcePath', function(path, callback) {
 			// callback(path)
-
 			var requests = [];
 			for (var i = 0; i < m_search_path.length; i++) {
 				var info = {};
@@ -10962,8 +11144,7 @@ $CLASS('XFrame', function(me){
 					}		
 				}
 			}
-
-		}
+		});
 
 		function trimLastSlash(path) {
 			if (path.substr(path.length - 1) == '/')
@@ -11000,7 +11181,7 @@ $CLASS('XFrame', function(me){
 
 $CLASS('UI.IXDraw', function(me){
 
-	$PUBLIC({
+	$PUBLIC_FUN({
 		'draw'       : $ABSTRACT,
 		'setAlpha'   : $ABSTRACT,
 		'setDstRect' : $ABSTRACT 
@@ -11012,7 +11193,7 @@ $CLASS('UI.IXDraw', function(me){
 $CLASS('UI.IXText', 
 $EXTENDS(UI.IXDraw),
 function(me){
-	$PUBLIC({
+	$PUBLIC_FUN({
 		'getText' : $ABSTRACT,
 		'measure' : $ABSTRACT
 	});
@@ -11025,7 +11206,7 @@ function(me){
 $CLASS('UI.IXImage',
 $EXTENDS(UI.IXDraw),
 function(me){
-	$PUBLIC({
+	$PUBLIC_FUN({
 		'setSrcRect'     : $ABSTRACT,
 		'setDrawType'    : $ABSTRACT,
 		'setPartRect'    : $ABSTRACT,
@@ -11035,76 +11216,98 @@ function(me){
 	});
 });
 
-$CLASS('UI.IXImage.DrawType', function(me){})
-.$STATIC({
-	'DIT_UNKNOW' : new UI.IXImage.DrawType(),
-	'DIT_NORMAL' : new UI.IXImage.DrawType(),
-	'DIT_STRETCH' : new UI.IXImage.DrawType(),
-	'DIT_9PART' : new UI.IXImage.DrawType(),
-	'DIT_3PARTH' : new UI.IXImage.DrawType(),
-	'DIT_3PARTV' : new UI.IXImage.DrawType(),
-	'DIT_CENTER' : new UI.IXImage.DrawType()
-});
+$ENUM('UI.IXImage.DrawType',
+[
+	'DIT_UNKNOW',
+	'DIT_NORMAL',
+	'DIT_STRETCH',
+	'DIT_9PART',
+	'DIT_3PARTH',
+	'DIT_3PARTV',
+	'DIT_CENTER'
+]);
 
 
 
 ;
 
-$CLASS('UI.XTextCanvasText', function(me){
+$CLASS('UI.XTextCanvasText', function(me, SELF){
 
-	$PUBLIC({
-		'draw' : draw,
+	$PUBLIC_FUN([
+		'draw',
 
-		'setAlpha' 		: setAlpha,
-		'setDstRect' 	: setDstRect,
+		'setAlpha',
+		'setDstRect',
 
-		'getText'		: getText,
-		'measure'		: measure,
+		'getText',
+		'measure',
 
-		'setText'		: setText,
-		'setFont'		: setFont,
-		'setColor'		: setColor,
-		'setAlignment'	: setAlignment,
-	});
-
+		'setText',
+		'setFont',
+		'setColor',
+		'setAlignment'
+	]);
 
 	var m_alpha = 255;
 	var m_dst_rect = new UI.Rect();
 	var m_text = '';
 	var m_face = 'Verdana, Arial, 微软雅黑, 宋体';
 	var m_size = 12;
-	var m_style = UI.XTextCanvasText.Style.STYLE_NORMAL;
+	var m_style = SELF.Style.STYLE_NORMAL;
 	var m_color = '#000';
-	var m_halign = UI.XTextCanvasText.Align.ALIGN_START;
-	var m_valign = UI.XTextCanvasText.Align.ALIGN_START;
+	var m_halign = SELF.Align.ALIGN_START;
+	var m_valign = SELF.Align.ALIGN_START;
 
 	var m_buffer = null;
 
+	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
+		if (!m_buffer) refreshBuffer();
 
-	function setAlpha(alpha) {
+		var dst_to_draw_real =
+			rect_to_draw.intersect(m_dst_rect);
+
+		if (dst_to_draw_real.isEmpty()) return;
+
+		var src_to_draw_real = 
+			new UI.Rect(dst_to_draw_real);
+		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
+
+		ctx.save();
+		ctx.globalAlpha = m_alpha;
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
+		ctx.restore();
+	});
+
+	$PUBLIC_FUN_IMPL('setAlpha', function (alpha) {
 		m_alpha = alpha;
-	};
+	});
 
-	function setDstRect(rc) {
+	$PUBLIC_FUN_IMPL('setDstRect', function (rc) {
 		if (rc.equals(m_dst_rect)) return;
 
 		releaseBuffer();
 		m_dst_rect  = rc;
-	}
+	});
 
-	function setText(text) {
+	$PUBLIC_FUN_IMPL('getText', function () {
+		return m_text;
+	});
+
+	$PUBLIC_FUN_IMPL('measure', function () {
+
+	});
+
+	$PUBLIC_FUN_IMPL('setText', function (text) {
 		
 		if (text == m_text) return;
 
 		releaseBuffer();
 		m_text = text;
-	}
+	});
 
-	function getText() {
-		return m_text;
-	}
-
-	function setFont(face, size, style) {
+	$PUBLIC_FUN_IMPL('setFont', function (face, size, style) {
 		if (m_face == face &&
 			m_size == size &&
 			m_style == style)
@@ -11114,13 +11317,13 @@ $CLASS('UI.XTextCanvasText', function(me){
 		m_face = face;
 		m_size = size;
 		m_style = style;
-	}
+	});
 
-	function setColor(color) {
+	$PUBLIC_FUN_IMPL('setColor', function (color) {
 		m_color = color;
-	}
+	});
 
-	function setAlignment(halign, valign) {
+	$PUBLIC_FUN_IMPL('setAlignment', function (halign, valign) {
 		if (m_halign == halign
 			&& m_valign == valign)
 			return;
@@ -11128,8 +11331,7 @@ $CLASS('UI.XTextCanvasText', function(me){
 		releaseBuffer();
 		m_halign = halign;
 		m_valign = valign;
-	}
-
+	});
 
 	function releaseBuffer() {
 		m_buffer = null;		
@@ -11148,10 +11350,10 @@ $CLASS('UI.XTextCanvasText', function(me){
 		canvas_text.setFontColor(m_color);
 
 		canvas_text.setBold(
-			!!(m_style & UI.XTextCanvasText.Style.STYLE_BOLD)
+			!!(m_style & SELF.Style.STYLE_BOLD)
 		);
 		canvas_text.setItalic(
-			!!(m_style & UI.XTextCanvasText.Style.STYLE_ITARIC)
+			!!(m_style & SELF.Style.STYLE_ITARIC)
 		);
 
 		canvas_text.draw(m_buffer.getContext('2d'),
@@ -11162,37 +11364,14 @@ $CLASS('UI.XTextCanvasText', function(me){
 		);
 	}
 
-	function draw(ctx, rect_to_draw) {
-		if (!m_buffer) refreshBuffer();
-
-		var dst_to_draw_real =
-			rect_to_draw.intersect(m_dst_rect);
-
-		if (dst_to_draw_real.isEmpty()) return;
-
-		var src_to_draw_real = 
-			new UI.Rect(dst_to_draw_real);
-		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
-
-		ctx.save();
-		ctx.globalAlpha = m_alpha;
-		ctx.drawImage(m_buffer, 
-			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
-			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
-		ctx.restore();
-	}
-
-	function measure() {
-
-	}
 
 	function convertAlignment(this_align) {
 		switch (this_align) {
-			case UI.XTextCanvasText.Align.ALIGN_START:
+			case SELF.Align.ALIGN_START:
 				return UI.XCanvasText.Align.ALIGN_START;
-			case UI.XTextCanvasText.Align.ALIGN_MIDDLE:
+			case SELF.Align.ALIGN_MIDDLE:
 				return UI.XCanvasText.Align.ALIGN_MIDDLE;
-			case UI.XTextCanvasText.Align.ALIGN_END:
+			case SELF.Align.ALIGN_END:
 				return UI.XCanvasText.Align.ALIGN_END;
 		}
 	}
@@ -11200,16 +11379,15 @@ $CLASS('UI.XTextCanvasText', function(me){
 
 });
 
+$ENUM('UI.XTextCanvasText.Align', 
+[
+	'ALIGN_START',
+	'ALIGN_MIDDLE',
+	'ALIGN_END'
+]);
 
-$CLASS('UI.XTextCanvasText.Align', function(me){})
-.$STATIC({
-	'ALIGN_START' 	: new UI.XTextCanvasText.Align(),
-	'ALIGN_MIDDLE'	: new UI.XTextCanvasText.Align(),
-	'ALIGN_END'		: new UI.XTextCanvasText.Align()
-});
-
-$CLASS('UI.XTextCanvasText.Style', function(me){})
-.$STATIC({
+$ENUM('UI.XTextCanvasText.Style', 
+{
 	'STYLE_NORMAL'		: 0x0,
 	'STYLE_ITARIC' 		: 0x1,
 	'STYLE_BOLD'		: 0x2,
@@ -11219,13 +11397,32 @@ $CLASS('UI.XTextCanvasText.Style', function(me){})
 
 $CLASS('UI.XImageCanvasImage', 
 $EXTENDS(UI.IXImage),
-function(me){
+function(me, SELF){
+
+	$PUBLIC_FUN([
+		'load',
+
+		'setSrcRect',
+		'setDstRect',
+		'setDrawType',
+		'setPartRect',
+		'setAlpha',
+
+		'getImageWidth',
+		'getImageHeight',
+
+		'draw',
+
+		'onImageLoaded',
+		'offImageLoaded'
+	]);
+
 
 	var m_img;
 	var m_buffer;
 
 	var m_draw_type = 
-		UI.XImageCanvasImage.DrawType.DIT_NORMAL;
+		SELF.DrawType.DIT_NORMAL;
 	var m_formatted_img;
 	var m_alpha = 255;
 
@@ -11241,25 +11438,7 @@ function(me){
 	var m_image_loaded_listener = [];
 
 
-	$PUBLIC({
-		'load' : load,
-
-		'setSrcRect'  : setSrcRect,
-		'setDstRect'  : setDstRect,
-		'setDrawType' : setDrawType,
-		'setPartRect' : setPartRect,
-		'setAlpha' : setAlpha,
-
-		'getImageWidth' : getImageWidth,
-		'getImageHeight' : getImageHeight,
-
-		'draw' : draw,
-
-		'onImageLoaded' : onImageLoaded,
-		'offImageLoaded' : offImageLoaded
-	});
-
-	function load(path) {
+	$PUBLIC_FUN_IMPL('load', function (path) {
 
 		m_unloaded_src_rect = 
 		m_unloaded_part_rect = 
@@ -11270,7 +11449,107 @@ function(me){
 			loadAsResource(path.substr(1));
 		else 
 			loadImageObject(path);
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('setSrcRect', function (rc) {
+
+		if (!m_loaded) {
+			m_unloaded_src_rect = rc;
+			return;
+		}
+
+		if (m_src_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_src_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setDstRect', function (rc) {
+		if (m_dst_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_dst_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setDrawType',	function (type) {
+
+		if (!m_loaded) {
+			m_unloaded_draw_type = type;
+			return;
+		}
+
+		if (m_draw_type == type)
+			return;
+
+		releaseBuffer();
+		m_draw_type = type;
+	});
+
+	$PUBLIC_FUN_IMPL('setPartRect', function (rc) {
+
+		if (!m_loaded) {
+			m_unloaded_part_rect = rc;
+			return;
+		}
+
+		if (m_part_rect.equals(rc))
+			return;
+
+		releaseBuffer();
+		m_part_rect = rc;
+	});
+
+	$PUBLIC_FUN_IMPL('setAlpha', function (alpha) {
+		m_alpha = alpha;
+	});
+
+	$PUBLIC_FUN_IMPL('getImageWidth', function () {
+		if (!m_loaded) return 0;
+		return m_img.getWidth();
+	});
+	$PUBLIC_FUN_IMPL('getImageHeight', function () {
+		if (!m_loaded) return 0;
+		return m_img.getHeight();
+	});
+
+	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
+		
+		if (!m_loaded) return;
+
+		if (!m_buffer) refreshBuffer();
+
+		var dst_to_draw_real =
+			rect_to_draw.intersect(m_dst_rect);
+
+		if (dst_to_draw_real.isEmpty()) return;
+
+		var src_to_draw_real = 
+			new UI.Rect(dst_to_draw_real);
+		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
+
+		ctx.save();
+		ctx.globalAlpha = m_alpha;
+		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
+		ctx.drawImage(m_buffer, 
+			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
+			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
+		ctx.restore();
+	});
+
+	$PUBLIC_FUN_IMPL('onImageLoaded', function (fn) {
+		m_image_loaded_listener.push(fn);
+	});
+
+	$PUBLIC_FUN_IMPL('offImageLoaded', function (fn) {
+		var index = m_image_loaded_listener.indexOf(fn);
+		if (index == -1) return;
+		m_image_loaded_listener.splice(index, 1);
+	});
+
+
+
 
 	function loadAsResource(path) { 
 		var mgr = UI.XResourceMgr.instance();
@@ -11322,19 +11601,19 @@ function(me){
 
 		switch (m_draw_type)
 		{
-			case UI.XImageCanvasImage.DrawType.DIT_NORMAL: 
+			case SELF.DrawType.DIT_NORMAL: 
 				drawNormal(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_STRETCH:  
+			case SELF.DrawType.DIT_STRETCH:  
 				drawStretch(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_9PART: 
+			case SELF.DrawType.DIT_9PART: 
 				draw9Part(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_3PARTH: 
+			case SELF.DrawType.DIT_3PARTH: 
 				draw3PartH(m_buffer.getContext('2d')); 
 				break;
-			case UI.XImageCanvasImage.DrawType.DIT_3PARTV: 
+			case SELF.DrawType.DIT_3PARTV: 
 				draw3PartV(m_buffer.getContext('2d')); 
 				break;
 		}
@@ -11423,11 +11702,11 @@ function(me){
 	function loadFormattedImageInfo() {
 		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_NORMAL;
+			m_draw_type = SELF.DrawType.DIT_NORMAL;
 		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_STRETCH;
+			m_draw_type = SELF.DrawType.DIT_STRETCH;
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
-			m_draw_type = UI.XImageCanvasImage.DrawType.DIT_9PART;
+			m_draw_type = SELF.DrawType.DIT_9PART;
 			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
 			else loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
@@ -11501,124 +11780,27 @@ function(me){
 		return r << 24 | g << 16 | b << 8 | a;
 	}
 
-	function getImageWidth() {
-		if (!m_loaded) return 0;
-		return m_img.getWidth();
-	}
-
-	function getImageHeight() {
-		if (!m_loaded) return 0;
-		return m_img.getHeight();
-	}
-
-	function setSrcRect(rc) {
-
-		if (!m_loaded) {
-			m_unloaded_src_rect = rc;
-			return;
-		}
-
-		if (m_src_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_src_rect = rc;
-	}
-
-	function setDstRect(rc) {
-		if (m_dst_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_dst_rect = rc;
-	}
-
-	function setDrawType(type) {
-
-		if (!m_loaded) {
-			m_unloaded_draw_type = type;
-			return;
-		}
-
-		if (m_draw_type == type)
-			return;
-
-		releaseBuffer();
-		m_draw_type = type;
-	} 
-
-	function setPartRect(rc) {
-
-		if (!m_loaded) {
-			m_unloaded_part_rect = rc;
-			return;
-		}
-
-		if (m_part_rect.equals(rc))
-			return;
-
-		releaseBuffer();
-		m_part_rect = rc;
-	}
-
-	function setAlpha(alpha) {
-		m_alpha = alpha;
-	}
-
-	function draw(ctx, rect_to_draw) {
-		
-		if (!m_loaded) return;
-
-		if (!m_buffer) refreshBuffer();
-
-		var dst_to_draw_real =
-			rect_to_draw.intersect(m_dst_rect);
-
-		if (dst_to_draw_real.isEmpty()) return;
-
-		var src_to_draw_real = 
-			new UI.Rect(dst_to_draw_real);
-		src_to_draw_real.offset(- m_dst_rect.left, - m_dst_rect.top);
-
-		ctx.save();
-		ctx.globalAlpha = m_alpha;
-		//m_img.draw(ctx, src_to_draw_real, dst_to_draw_real);
-		ctx.drawImage(m_buffer, 
-			src_to_draw_real.left, src_to_draw_real.top, src_to_draw_real.width(), src_to_draw_real.height(),
-			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
-		ctx.restore();
-	}
-
-	function onImageLoaded(fn) {
-		m_image_loaded_listener.push(fn);
-	}
-
-	function offImageLoaded(fn) {
-		var index = m_image_loaded_listener.indexOf(fn);
-		if (index == -1) return;
-		m_image_loaded_listener.splice(index, 1);
-	}
+	
 
 });
 
 ;
 
 
-$CLASS('UI.XCanvasText', function(me){
+$CLASS('UI.XCanvasText', function(me, SELF){
 
-	$PUBLIC({
-		'draw' : draw,
+	$PUBLIC_FUN([
+		'draw',
 
-		'setFontFace'	: setFontFace,
-		'setFontSize'	: setFontSize,     // Number. Measured by px.
-		'setLineHeight' : setLineHeight, 
-		'setFontColor'	: setFontColor,
+		'setFontFace',
+		'setFontSize', 	// Number, measured by pixel. 
+		'setLineHeight',
+		'setFontColor',
 
-		'setBold' 		: setBold,
-		'setItalic' 	: setItalic
-	});
+		'setBold',
+		'setItalic'
+	]);
 
-	
 	var m_font_face = 'Verdana, Arial, 微软雅黑, 宋体';
 	var m_font_size = 12;
 	var m_font_color = '#000';
@@ -11630,8 +11812,7 @@ $CLASS('UI.XCanvasText', function(me){
 
 	var $body = $('BODY');
 
-
-	function draw(ctx, string, rect, halign, valign) {
+	$PUBLIC_FUN_IMPL('draw', function(ctx, string, rect, halign, valign) {
 
 		ctx.save();
 
@@ -11664,14 +11845,35 @@ $CLASS('UI.XCanvasText', function(me){
 		}
 
 		ctx.restore();
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
+		m_font_face = face;
+	});
+	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
+		m_font_size = size - 0;
+		m_line_height = size * 1.5;
+	});
+
+	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
+		m_line_height = size - 0;
+	});
+	$PUBLIC_FUN_IMPL('setFontColor', function (color) {
+		m_font_color = color;
+	});
+	$PUBLIC_FUN_IMPL('setBold', function (b) {
+		m_bold = b;
+	});
+	$PUBLIC_FUN_IMPL('setItalic', function (b) {
+		m_italic = b;
+	});	
 
 	function getYStart(valign, line_count, height) {
 		
-		if (valign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+		if (valign == SELF.Align.ALIGN_MIDDLE)
 			return (height - line_count * m_line_height) / 2;
 
-		if (valign == UI.XCanvasText.Align.ALIGN_END)
+		if (valign == SELF.Align.ALIGN_END)
 			return height - line_count * m_line_height;
 
 		return 0;
@@ -11679,10 +11881,10 @@ $CLASS('UI.XCanvasText', function(me){
 
 	function getXStart(halign, line_width, width) {
 
-		if (halign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+		if (halign == SELF.Align.ALIGN_MIDDLE)
 			return (width - line_width) / 2;
 
-		if (halign == UI.XCanvasText.Align.ALIGN_END)
+		if (halign == SELF.Align.ALIGN_END)
 			return width - line_width;
 
 		return 0;
@@ -11735,61 +11937,36 @@ $CLASS('UI.XCanvasText', function(me){
 	function measureText(string) {
 	}
 
-	function setBold(b) {
-		m_bold = b;
-	}
-
-	function setItalic(b) {
-		m_italic = b;
-	}
-
-	function setFontFace(face) {
-		m_font_face = face;
-	}
-
-	function setFontSize(size) {
-		m_font_size = size - 0;
-		m_line_height = size * 1.5;
-	}
-
-	function setLineHeight(size) {
-		m_line_height = size - 0;
-	}
-
-	function setFontColor(color) {
-		m_font_color = color;
-	}
-	
-
-
 });
 
-$CLASS('UI.XCanvasText.Align', function(me){
-})
-.$STATIC({
-	'ALIGN_START' 	: new UI.XCanvasText.Align(),
-	'ALIGN_MIDDLE' 	: new UI.XCanvasText.Align(),
-	'ALIGN_END' 	: new UI.XCanvasText.Align()
-});
+$ENUM('UI.XCanvasText.Align',
+[
+	'ALIGN_START',
+	'ALIGN_MIDDLE',
+	'ALIGN_END'
+]);
+
 ;
 
 $CLASS('UI.XCanvasImage', function(me){
 
+	
+	$PUBLIC_FUN([
+		'getWidth',
+		'getHeight',
+		
+		'clip',
+		
+		'draw',
+		'getCanvas',
+		'getImageData'
+	]);
 
-	var m_canvas;
-
-	$PUBLIC({
-		'getWidth' : getWidth,
-		'getHeight' : getHeight,
-		
-		'clip' : clip,
-		
-		'draw' : draw,
-		'getCanvas' : getCanvas,
-		'getImageData' : getImageData,
-		
+	$PUBLIC_VAR({		
 		'src' : ''
 	});
+
+	var m_canvas;
 
 	$CONSTRUCTOR(function(img_src, sx, sy, sw, sh){
 
@@ -11811,7 +11988,10 @@ $CLASS('UI.XCanvasImage', function(me){
 		me.src = img_src.src;
 	});
 
-	function clip(x, y, width, height) {
+	$PUBLIC_FUN_IMPL('getWidth', function () {return m_canvas.width;});
+	$PUBLIC_FUN_IMPL('getHeight', function () {return m_canvas.height;});
+
+	$PUBLIC_FUN_IMPL('clip', function (x, y, width, height) {
 		
 		var new_canvas = document.createElement('canvas');
 		new_canvas.width = width;
@@ -11821,23 +12001,9 @@ $CLASS('UI.XCanvasImage', function(me){
 		ctx.drawImage(m_canvas, x, y, width, height,
 			0, 0, width, height);
 		m_canvas = new_canvas;
-	}
+	});
 
-	function getWidth() {return m_canvas.width;}
-	function getHeight() {return m_canvas.height;}
-
-
-	function getCanvas() {
-		return m_canvas;
-	}
-
-	function getImageData() {
-		return m_canvas
-			.getContext('2d')
-			.getImageData(0, 0, m_canvas.width, m_canvas.height);
-	}
-
-	function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
+	$PUBLIC_FUN_IMPL('draw', function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
 		if (sx.instanceOf && sx.instanceOf(UI.Rect)) {
 			var src = sx, drc = sy;
 			draw(ctx, 
@@ -11854,9 +12020,18 @@ $CLASS('UI.XCanvasImage', function(me){
 			} 
 			else
 				ctx.drawImage(m_canvas, sx, sy, sw, sh, dx, dy, dw, dh);
-
 		}
 			
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('getCanvas', function () {
+		return m_canvas;
+	});
+
+	$PUBLIC_FUN_IMPL('getImageData', function () {
+		return m_canvas
+			.getContext('2d')
+			.getImageData(0, 0, m_canvas.width, m_canvas.height);
+	});
 
 });

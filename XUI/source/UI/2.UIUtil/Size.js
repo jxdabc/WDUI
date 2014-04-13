@@ -3,7 +3,7 @@
 
 $CLASS('UI.Size', function(me){
 
-	$PUBLIC({
+	$PUBLIC_VAR({
 		'w' : 0,
 		'h' : 0
 	});

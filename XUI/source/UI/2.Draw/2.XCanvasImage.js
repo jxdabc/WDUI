@@ -2,21 +2,23 @@
 
 $CLASS('UI.XCanvasImage', function(me){
 
+	
+	$PUBLIC_FUN([
+		'getWidth',
+		'getHeight',
+		
+		'clip',
+		
+		'draw',
+		'getCanvas',
+		'getImageData'
+	]);
 
-	var m_canvas;
-
-	$PUBLIC({
-		'getWidth' : getWidth,
-		'getHeight' : getHeight,
-		
-		'clip' : clip,
-		
-		'draw' : draw,
-		'getCanvas' : getCanvas,
-		'getImageData' : getImageData,
-		
+	$PUBLIC_VAR({		
 		'src' : ''
 	});
+
+	var m_canvas;
 
 	$CONSTRUCTOR(function(img_src, sx, sy, sw, sh){
 
@@ -38,7 +40,10 @@ $CLASS('UI.XCanvasImage', function(me){
 		me.src = img_src.src;
 	});
 
-	function clip(x, y, width, height) {
+	$PUBLIC_FUN_IMPL('getWidth', function () {return m_canvas.width;});
+	$PUBLIC_FUN_IMPL('getHeight', function () {return m_canvas.height;});
+
+	$PUBLIC_FUN_IMPL('clip', function (x, y, width, height) {
 		
 		var new_canvas = document.createElement('canvas');
 		new_canvas.width = width;
@@ -48,23 +53,9 @@ $CLASS('UI.XCanvasImage', function(me){
 		ctx.drawImage(m_canvas, x, y, width, height,
 			0, 0, width, height);
 		m_canvas = new_canvas;
-	}
+	});
 
-	function getWidth() {return m_canvas.width;}
-	function getHeight() {return m_canvas.height;}
-
-
-	function getCanvas() {
-		return m_canvas;
-	}
-
-	function getImageData() {
-		return m_canvas
-			.getContext('2d')
-			.getImageData(0, 0, m_canvas.width, m_canvas.height);
-	}
-
-	function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
+	$PUBLIC_FUN_IMPL('draw', function draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
 		if (sx.instanceOf && sx.instanceOf(UI.Rect)) {
 			var src = sx, drc = sy;
 			draw(ctx, 
@@ -81,9 +72,18 @@ $CLASS('UI.XCanvasImage', function(me){
 			} 
 			else
 				ctx.drawImage(m_canvas, sx, sy, sw, sh, dx, dy, dw, dh);
-
 		}
 			
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('getCanvas', function () {
+		return m_canvas;
+	});
+
+	$PUBLIC_FUN_IMPL('getImageData', function () {
+		return m_canvas
+			.getContext('2d')
+			.getImageData(0, 0, m_canvas.width, m_canvas.height);
+	});
 
 });

@@ -2,7 +2,7 @@
 
 $CLASS('UI.Pt', function(me){
 
-	$PUBLIC({
+	$PUBLIC_VAR({
 		'x' : 0,
 		'y' : 0
 	});

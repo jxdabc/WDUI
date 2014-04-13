@@ -19,36 +19,45 @@
 
 			var a = 10;
 
-			$PUBLIC({
+			$PUBLIC_VAR({
 				'a' : 10,
 				'b' : 20,
 				'c' : 30,
+				'md' : 10
+			});
+
+			$PUBLIC_FUN({
 				'd' : function () {return 'BASE1::d';},
 				'e' : function () {return 'BASE1::e';},
 				'f' : function () {return 'BASE1::f';},
 				'po1' : function() {return me.e();},
 				'po2' : function() {return me.c;},
 				'setPrivate' : function(v) { a = v; },
-				'getPrivate' : function() {return a; },
-				'md' : 10
+				'getPrivate' : function() {return a; }
 			});
+
+
 		})
 		.$STATIC({
 			'D1' : 10,
 			'D2' : 20,
 			'M1' : function () {return 'TEST.BASE1:M1';},
-			'M2' : function () {return 'TEST.BASE1:M2';}
+			'M2' : function () {return 'TEST.BASE1:M2';},
+			'M3' : function () {return 'TEST.BASE1:M3';}
 		});
 
 
 		$CLASS('TEST.BASE2', function(me) {
-			$PUBLIC({
+			$PUBLIC_VAR({
 				'a' : 10,
 				'b' : 20,
 				'c' : 130,
-				'd' : function () {return 'BASE2::d';},
 				'md' : 10,
-				'md2' : 20,
+				'md2' : 20
+			});
+
+			$PUBLIC_FUN({
+				'd' : function () {return 'BASE2::d';}
 			});
 		})
 		.$STATIC({
@@ -56,19 +65,20 @@
 			'MD' : 10,
 			'D1' : 50,
 			'M1' : function () {return 'TEST.BASE2:M2';},
-
 		});
 
 		$CLASS('TEST.DRIVED1', 
 		$EXTENDS(TEST.BASE1, TEST.BASE2),
 		function(me){
 
-
-			$PUBLIC({
+			$PUBLIC_VAR({
 				'a' : 110,
-				'd' : function () {return 'DRIVED1::d';},
 				'md' : 10
 			});
+
+			$PUBLIC_FUN({
+				'd' : function () {return 'DRIVED1::d';}
+			})
 
 		})
 		.$STATIC({
@@ -79,13 +89,15 @@
 		$CLASS('TEST.DRIVED2', 
 		$EXTENDS(TEST.DRIVED1),
 		function(me){
-			$PUBLIC({
+			$PUBLIC_VAR({
 				'c'  : 110,
-				'nd' : 111,
+				'nd' : 111				
+			});
+
+			$PUBLIC_FUN({
 				'e'  : function () {return 'DRIVED2::e';},
 				'nf' : function () {return 'DRIVED2::nf';}
-				
-			});
+			})
 		})
 		.$STATIC({
 			'D2' : 110,
@@ -158,6 +170,7 @@
 		console.log(TEST.BASE1.M1() === 'TEST.BASE1:M1');
 		console.log(TEST.BASE1.M2() === 'TEST.BASE1:M2');
 
+
 		console.log(TEST.DRIVED1.D1 === 50);
 		console.log(TEST.DRIVED1.D2 === 20);
 		console.log(TEST.DRIVED1.M1() === 'TEST.DRIVED1:M1');
@@ -176,6 +189,9 @@
 		TEST.DRIVED2.MD2 = 'luck';
 		console.log(TEST.DRIVED1.MD2 === 'luck');
 		console.log(TEST.BASE2.MD2 === 'luck');
+
+		TEST.DRIVED2.M3 = 'FailedToModify';
+		console.log(typeof TEST.DRIVED2.M3 == function);
 
 	})
 	()

@@ -2,24 +2,24 @@
 
 $CLASS('XUIObject', function(me){
 
-	$PUBLIC({
-		'toString' : toString,
-		'getClassName' : getClassName,
-		'instanceOf' : instanceOf
-	});
+	$PUBLIC_FUN([
+		'toString',
+		'getClassName',
+		'instanceOf'
+	]);
 
 	$CONSTRUCTOR(function(){
 	});
 
-	function toString() {
+	$PUBLIC_FUN_IMPL('toString', function(){
 		return 'XUIObject: ' + me.classobj.classname;
-	}
+	});
 
-	function getClassName() {
+	$PUBLIC_FUN_IMPL('getClassName', function(){
 		return me.classobj.classname;
-	}
+	});
 
-	function instanceOf(cls) {
+	$PUBLIC_FUN_IMPL('instanceOf', function(cls){
 		if (typeof cls == "string") {
 			try {
 				cls = eval(cls);
@@ -31,8 +31,8 @@ $CLASS('XUIObject', function(me){
 
 		var c = me.classobj;
 
-		return isCls1DerivedClassOfCls2(c, cls);		
-	}
+		return isCls1DerivedClassOfCls2(c, cls);	
+	});
 
 	function isCls1DerivedClassOfCls2(cls1, cls2) {
 		if (cls1 == cls2) return true;

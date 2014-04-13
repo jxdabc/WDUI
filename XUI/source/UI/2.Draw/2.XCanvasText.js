@@ -1,21 +1,20 @@
 ;
 
 
-$CLASS('UI.XCanvasText', function(me){
+$CLASS('UI.XCanvasText', function(me, SELF){
 
-	$PUBLIC({
-		'draw' : draw,
+	$PUBLIC_FUN([
+		'draw',
 
-		'setFontFace'	: setFontFace,
-		'setFontSize'	: setFontSize,     // Number. Measured by px.
-		'setLineHeight' : setLineHeight, 
-		'setFontColor'	: setFontColor,
+		'setFontFace',
+		'setFontSize', 	// Number, measured by pixel. 
+		'setLineHeight',
+		'setFontColor',
 
-		'setBold' 		: setBold,
-		'setItalic' 	: setItalic
-	});
+		'setBold',
+		'setItalic'
+	]);
 
-	
 	var m_font_face = 'Verdana, Arial, 微软雅黑, 宋体';
 	var m_font_size = 12;
 	var m_font_color = '#000';
@@ -27,8 +26,7 @@ $CLASS('UI.XCanvasText', function(me){
 
 	var $body = $('BODY');
 
-
-	function draw(ctx, string, rect, halign, valign) {
+	$PUBLIC_FUN_IMPL('draw', function(ctx, string, rect, halign, valign) {
 
 		ctx.save();
 
@@ -61,14 +59,35 @@ $CLASS('UI.XCanvasText', function(me){
 		}
 
 		ctx.restore();
-	}
+	});
+
+	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
+		m_font_face = face;
+	});
+	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
+		m_font_size = size - 0;
+		m_line_height = size * 1.5;
+	});
+
+	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
+		m_line_height = size - 0;
+	});
+	$PUBLIC_FUN_IMPL('setFontColor', function (color) {
+		m_font_color = color;
+	});
+	$PUBLIC_FUN_IMPL('setBold', function (b) {
+		m_bold = b;
+	});
+	$PUBLIC_FUN_IMPL('setItalic', function (b) {
+		m_italic = b;
+	});	
 
 	function getYStart(valign, line_count, height) {
 		
-		if (valign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+		if (valign == SELF.Align.ALIGN_MIDDLE)
 			return (height - line_count * m_line_height) / 2;
 
-		if (valign == UI.XCanvasText.Align.ALIGN_END)
+		if (valign == SELF.Align.ALIGN_END)
 			return height - line_count * m_line_height;
 
 		return 0;
@@ -76,10 +95,10 @@ $CLASS('UI.XCanvasText', function(me){
 
 	function getXStart(halign, line_width, width) {
 
-		if (halign == UI.XCanvasText.Align.ALIGN_MIDDLE)
+		if (halign == SELF.Align.ALIGN_MIDDLE)
 			return (width - line_width) / 2;
 
-		if (halign == UI.XCanvasText.Align.ALIGN_END)
+		if (halign == SELF.Align.ALIGN_END)
 			return width - line_width;
 
 		return 0;
@@ -132,39 +151,11 @@ $CLASS('UI.XCanvasText', function(me){
 	function measureText(string) {
 	}
 
-	function setBold(b) {
-		m_bold = b;
-	}
-
-	function setItalic(b) {
-		m_italic = b;
-	}
-
-	function setFontFace(face) {
-		m_font_face = face;
-	}
-
-	function setFontSize(size) {
-		m_font_size = size - 0;
-		m_line_height = size * 1.5;
-	}
-
-	function setLineHeight(size) {
-		m_line_height = size - 0;
-	}
-
-	function setFontColor(color) {
-		m_font_color = color;
-	}
-	
-
-
 });
 
-$CLASS('UI.XCanvasText.Align', function(me){
-})
-.$STATIC({
-	'ALIGN_START' 	: new UI.XCanvasText.Align(),
-	'ALIGN_MIDDLE' 	: new UI.XCanvasText.Align(),
-	'ALIGN_END' 	: new UI.XCanvasText.Align()
-});
+$ENUM('UI.XCanvasText.Align',
+[
+	'ALIGN_START',
+	'ALIGN_MIDDLE',
+	'ALIGN_END'
+]);
