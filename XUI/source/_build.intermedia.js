@@ -10703,11 +10703,11 @@ String.prototype.format = function()
 					configurable : false,
 					set: function (val) 
 					{
-						object.$THIS[i] = val;
+						polymorphism_obj.$THIS[i] = val;
 					},
 					get: function () 
 					{
-						return object.$THIS[i];
+						return polymorphism_obj.$THIS[i];
 					}
 				});
 			}
@@ -10716,6 +10716,8 @@ String.prototype.format = function()
 		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
 		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
 		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+
+		polymorphism_obj.$SELFOBJ = object;
 	}
 
 	function construct(object_info, args) {
@@ -10876,7 +10878,9 @@ $CLASS('UI', function(){});
 ;
 
 $ENUM('UI.EVENT_ID', [
-	'EVENT_TIMER'
+	'EVENT_TIMER',
+
+	'EVENT_DELAY_UPDATE_LAYOUT'
 ]);
 ;
 
@@ -11059,13 +11063,13 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'getFrameByName',
 		'getFramesByName',
 
-		// 'create',
+		'create',
 
-		// 'generateLayoutParam',
-		// 'beginUpdateLayoutParam',
-		// 'endUpdateLayoutParam',
-		// 'isLayouting',
-		// 'invalidateLayout'
+		'generateLayoutParam',
+		'beginUpdateLayoutParam',
+		'endUpdateLayoutParam',
+		'isLayouting',
+		'invalidateLayout'
 	]);
 
 	var m_parent = null;
@@ -11073,6 +11077,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 	var m_layout_param 			= null;
 	var m_delay_layout_param 	= null;
 
+	var m_delay_update_layout_param_scheduled = false;
 
 	var m_name = null;
 	var m_child_frames = [];
@@ -11133,8 +11138,21 @@ $CLASS('UI.XFrame', function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function() {
+		if (m_delay_layout_param) {
+			if (m_delay_update_layout_param_scheduled)
+				return;
 
+			m_delay_update_layout_param_scheduled = true;
 
+			UI.XMessageService.instance().
+				postFrameEvent(me.$THIS, {'id' :UI.EVENT_ID.EVENT_DELAY_UDPATE_LAYOUT});
+
+			return;
+		}
+
+		if (m_parent) m_parent.invalidateLayout();
+
+		return;
 	});
 
 
@@ -11788,7 +11806,7 @@ function(me, SELF){
 		else initSrcRect();
 
 		$.each(m_image_loaded_listener, function(i,v){
-			v.call(me);
+			v.call(me.$THIS);
 		});
 	}
 

@@ -341,11 +341,11 @@
 					configurable : false,
 					set: function (val) 
 					{
-						object.$THIS[i] = val;
+						polymorphism_obj.$THIS[i] = val;
 					},
 					get: function () 
 					{
-						return object.$THIS[i];
+						return polymorphism_obj.$THIS[i];
 					}
 				});
 			}
@@ -354,6 +354,8 @@
 		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
 		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
 		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+
+		polymorphism_obj.$SELFOBJ = object;
 	}
 
 	function construct(object_info, args) {

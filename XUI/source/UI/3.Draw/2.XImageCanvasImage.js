@@ -188,7 +188,7 @@ function(me, SELF){
 		else initSrcRect();
 
 		$.each(m_image_loaded_listener, function(i,v){
-			v.call(me);
+			v.call(me.$THIS);
 		});
 	}
 

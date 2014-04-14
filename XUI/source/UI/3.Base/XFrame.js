@@ -9,13 +9,18 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'getFrameByName',
 		'getFramesByName',
 
-		// 'create',
+		'create',
 
-		// 'generateLayoutParam',
-		// 'beginUpdateLayoutParam',
-		// 'endUpdateLayoutParam',
-		// 'isLayouting',
-		// 'invalidateLayout'
+		'generateLayoutParam',
+		'beginUpdateLayoutParam',
+		'endUpdateLayoutParam',
+		'isLayouting',
+		'invalidateLayout'
+	]);
+
+	$MESSAGE_MAP('EVENT', 
+	[
+		$MAP(UI.EVENT_ID.EVENT_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout')
 	]);
 
 	var m_parent = null;
@@ -23,6 +28,9 @@ $CLASS('UI.XFrame', function(me, SELF){
 	var m_layout_param 			= null;
 	var m_delay_layout_param 	= null;
 
+	var m_delay_update_layout_param_scheduled = false;
+
+	var m_layout_invalid = false;
 
 	var m_name = null;
 	var m_child_frames = [];
@@ -83,23 +91,44 @@ $CLASS('UI.XFrame', function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function() {
+		if (m_delay_layout_param) {
+			if (m_delay_update_layout_param_scheduled)
+				return;
 
+			m_delay_update_layout_param_scheduled = true;
+
+			UI.XMessageService.instance().
+				postFrameEvent(me.$THIS, {'id' :UI.EVENT_ID.EVENT_DELAY_UDPATE_LAYOUT});
+
+			return;
+		}
+
+		if (m_parent) m_parent.invalidateLayout();
+
+		return;
+	});
+
+	$PUBLIC_FUN_IMPL('isLayouting', function() {
+		if (m_parent) return m_parent.isLayouting();
+		return false;
+	});
+
+	$PUBLIC_FUN('invalidateLayout', function(){
 
 	});
 
+	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
+		if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
+			return;
 
-	// function endUpdateLayoutParam() {
-	// 	// TODO: delay layout part. 
+		m_delay_update_layout_param_schedule = false;
 
-	// 	if (m_parent) m_parent.invalidateLayout();
-	// }
+		m_layout_param = m_delay_layout_param;
+		m_delay_layout_param = null;
 
-	// function isLayouting() {
-	// 	if (m_parent)
-	// 		return m_parent.isLayouting();
+		me.endUpdateLayoutParam();
+	});
 
-	// 	return false;
-	// }
 
 	// function invalidateLayout() {
 
