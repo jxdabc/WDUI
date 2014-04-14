@@ -32,6 +32,8 @@
 		$EXTENDS(TEST.MessageTestBase),
 		function(me, SELF){
 
+			var i = 0;
+
 			$MESSAGE_MAP('EVENT',
 			[
 				$CHAIN(TEST.MessageTestBase),
@@ -39,14 +41,15 @@
 			]);
 
 			$MESSAGE_HANDLER('mytimer', function(msg){
-				console.log(SELF.classname, msg);
+				console.log(i++, SELF.classname, msg);
+				if (i == 10) UI.XEventService.instance().killTimer(timer_id);
 				return true;
 			});
 
 		});
 
 		var obj = new TEST.MesageTest();
-		UI.XEventService.instance().setTimer(obj, 1000);
+		var timer_id = UI.XEventService.instance().setTimer(obj, 1000);
 
 	})();
 
