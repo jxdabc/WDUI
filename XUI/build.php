@@ -104,9 +104,9 @@
 		$r = explode('.', $r); $r = $r[0];
 
 		if ((string)(int)$l == $l) $l = (int)$l;
-		else $l = -1;
+		else $l = PHP_INT_MAX;
 		if ((string)(int)$r == $r) $r = (int)$r;
-		else $r = -1;
+		else $r = PHP_INT_MAX;
 
 		return $l - $r;
 	}

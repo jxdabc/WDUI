@@ -10409,8 +10409,7 @@ String.prototype.format = function()
 			if (!this || !this.classobj)
 				return factory.apply(new empty_obj_factory(), arguments);
 
-			var me = this;
-			var my_arguments = arguments;
+			var my_arguments = Array.prototype.slice.call(arguments, 0);
 
 			// $.each(this, function(i, v){
 			// 	if (!me.hasOwnProperty(i)) return;
@@ -10423,84 +10422,19 @@ String.prototype.format = function()
 			scope(polymorphism_obj, factory);
 			var object_info = object_info_stack.pop();
 
-			// Parent construction. 
-			var extend_list_with_args = {};
-			$.each(extend_list || [], function(i,v){
-				extend_list_with_args[v.classname] = [];
-			});
-			$.each(object_info.parent_constructor_list || [], function(i,v){
-				v.apply(global, 
-					[extend_list_with_args].concat(Array.prototype.slice.call(my_arguments, 0)));
-			});
-			var parent_list = buildParent(this, extend_list, extend_list_with_args);
+			var parent_list = buildParent(my_arguments, object_info, this, extend_list);
 
-			// Member initialization. 
-			$.each(object_info.public_var_list || [], function(i,v){
-				$.each(v, function(ii,vv){
-					makeProperty(me, ii, vv, true);
-				});
-			});
-			$.each(object_info.public_fun_list || [], function(i,v){
-				$.each(v, function(ii,vv){
-					if (!object_info.public_fun_impl_map[vv])
-						throw new Exception('XUIClass::PFNI', 
-							'XUIClass: Public function ' + vv + ' not implemented. ');
-					makeProperty(me, vv, object_info.public_fun_impl_map[vv], false);
-				});
-			});
+			memberInitialize(object_info, this);
+			
+			addMessageHandingMechanism(object_info, this, parent_list);
 
-			// $ME reference definition. 
-			var real_obj = this;
-			Object.defineProperty(this, '$ME', 
-			{
-				enumerable : false,
-				configurable : false,
-				set: function (val) 
-				{
-					real_obj = val;
-					$.each(parent_list, function(i,v){
-						v.obj.$ME = val;
-					});
-				},
-				get: function () 
-				{
-					return real_obj;			
-				}
-			});
+			buildThisReference(this, parent_list);
 
-			// polymorphism_obj definition. 
-			$.each(this, function(i,v){
-				if (!me.hasOwnProperty(i)) return;
-				if (typeof v != "function")
-					makeReference(polymorphism_obj, i, me, i);
-				else
-				{
-					Object.defineProperty(polymorphism_obj, i, 
-					{
-						enumerable : true,
-						configurable : false,
-						set: function (val) 
-						{
-							me.$ME[i] = val;
-						},
-						get: function () 
-						{
-							return me.$ME[i];
-						}
-					});
-				}
+			buildPolymophismObject(this, polymorphism_obj);
 
-				makeReference(polymorphism_obj, '$ME', me, '$ME');
-				makeReference(polymorphism_obj, '$PARENT', me, '$PARENT');
-			});
+			construct(object_info, my_arguments);
 
-			// Self construction. 
-			$.each(object_info.constructor_list || [], function(i,v){
-				v.apply(global, my_arguments);
-			});
-
-			// $ME reference initialization. 
-			this.$ME = this;
+			this.$THIS = this;
 
 			return this;
 		}
@@ -10555,6 +10489,30 @@ String.prototype.format = function()
 		info.constructor_list.push(fn);
 	}
 
+	global.$MESSAGE_MAP = function(name, items) {
+		var info = object_info_stack.last();
+		info.message_map = info.message_map || {};
+		info.message_map[name] = items;
+	}
+
+	global.$MAP = function(id, fun) {
+		return {'id' : id, 'handler' : fun};		
+	}
+
+	global.$CHAIN = function(direct_parent) {
+
+		if (typeof direct_parent != 'string')
+			direct_parent = direct_parent.classname;
+
+		return {'chain' : direct_parent};
+	}
+
+	global.$MESSAGE_HANDLER = function(name, fn) {
+		var info = object_info_stack.last();
+		info.message_handlers = info.message_handlers || {};
+		info.message_handlers[name] = fn;
+	}
+
 	global.$ABSTRACT = function() { 
 		throw new Exception('XUIClass::AFNI', 
 			'Abstract funtion not implemented. '); 
@@ -10586,7 +10544,16 @@ String.prototype.format = function()
 		classobj.$STATIC(global_list);
 	}
 
-	function buildParent(object, extend_list, extend_list_with_args) {
+	function buildParent(args, object_info, object, extend_list) {
+
+		var extend_list_with_args = {};
+		$.each(extend_list || [], function(i,v){
+			extend_list_with_args[v.classname] = [];
+		});
+		$.each(object_info.parent_constructor_list || [], function(i,v){
+			v.apply(global, 
+				[extend_list_with_args].concat(args));
+		});
 
 		var parent_list =[];
 
@@ -10610,6 +10577,12 @@ String.prototype.format = function()
 			configurable : false,
 			writable : false,
 			value : function (name) {
+				if (typeof name == 'undefined')
+					return parent_list;
+
+				if (typeof name != "string")
+					name = name.classname;
+
 				var direct_parent = null;
 				$.each(parent_list, function(i,v){
 					if (direct_parent) return;
@@ -10626,6 +10599,129 @@ String.prototype.format = function()
 		});
 
 		return parent_list;
+	}
+
+	function memberInitialize(object_info, object) {
+		$.each(object_info.public_var_list || [], function(i,v){
+			$.each(v, function(ii,vv){
+				makeProperty(object, ii, vv, true);
+			});
+		});
+		$.each(object_info.public_fun_list || [], function(i,v){
+			$.each(v, function(ii,vv){
+				if (!object_info.public_fun_impl_map[vv])
+					throw new Exception('XUIClass::PFNI', 
+						'XUIClass: Public function ' + vv + ' not implemented. ');
+				makeProperty(object, vv, object_info.public_fun_impl_map[vv], false);
+			});
+		});
+	}
+
+	function addMessageHandingMechanism(object_info, object, parent_list) {
+		var maps = object_info.message_map;
+		var handlers = object_info.message_handlers;
+
+		$.each(maps || {}, function(i,v){
+			$.each(v, function(i,v){
+				if (v.chain) {
+					var parent_name = v.chain;
+					var parent = null;
+					$.each(parent_list, function(i,v){
+						if (parent) return;
+						if (v.name == parent_name)
+							parent = v.obj;
+					});
+
+					if (!parent)
+						throw new Exception('XUIClass::NDP', 
+							'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
+
+					v.chain = parent;
+				} 
+				else if (!handlers[v.handler])
+					throw new 
+						Exception('XUIClass::MHND', 'XUIClass: Message handler ' + v.handler + ' not defined. ');
+			});
+		});
+
+		Object.defineProperty(object, '$DISPATCH_MESSAGE', {
+			enumerable : false,
+			configurable : false,
+			writable : false,
+			value : function (type, msg) {
+				var map = maps && maps[type];
+				var handled = false;
+				if (!map) {
+					$.each(parent_list, function(i,v) {
+						if (handled) return;
+						handled = v.obj.$DISPATCH_MESSAGE(type, msg);
+					});
+				} else {
+					$.each(map, function(i,v){
+						if (handled) return;
+						if (v.chain)
+							handled = v.chain.$DISPATCH_MESSAGE(type, msg);
+						else if (v.id == msg.id)
+							handled = handlers[v.handler](msg);
+					});
+				}
+				return handled;
+			}
+		});
+	}
+
+	function buildThisReference(object, parent_list) {
+		var real_obj = object;
+		Object.defineProperty(object, '$THIS', 
+		{
+			enumerable : false,
+			configurable : false,
+			set: function (val) 
+			{
+				real_obj = val;
+				$.each(parent_list, function(i,v){
+					v.obj.$THIS = val;
+				});
+			},
+			get: function () 
+			{
+				return real_obj;			
+			}
+		});
+	}
+
+	function buildPolymophismObject(object, polymorphism_obj) {
+		$.each(object, function(i,v){
+			if (!object.hasOwnProperty(i)) return;
+			if (typeof v != "function")
+				makeReference(polymorphism_obj, i, object, i);
+			else
+			{
+				Object.defineProperty(polymorphism_obj, i, 
+				{
+					enumerable : true,
+					configurable : false,
+					set: function (val) 
+					{
+						object.$THIS[i] = val;
+					},
+					get: function () 
+					{
+						return object.$THIS[i];
+					}
+				});
+			}
+		});
+
+		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
+		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
+		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+	}
+
+	function construct(object_info, args) {
+		$.each(object_info.constructor_list || [], function(i,v){
+			v.apply(global, args);
+		});
 	}
 
 
@@ -10696,11 +10792,11 @@ $CLASS('XUIObject', function(me){
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function(){
-		return 'XUIObject: ' + me.$ME.classobj.classname;
+		return 'XUIObject: ' + me.$THIS.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('getClassName', function(){
-		return me.$ME.classobj.classname;
+		return me.$THIS.classobj.classname;
 	});
 
 	$PUBLIC_FUN_IMPL('instanceOf', function(cls){
@@ -10713,7 +10809,7 @@ $CLASS('XUIObject', function(me){
 		if (typeof cls != "function")
 			return false;
 
-		var c = me.$ME.classobj;
+		var c = me.$THIS.classobj;
 
 		return isCls1DerivedClassOfCls2(c, cls);	
 	});
@@ -10777,6 +10873,11 @@ $CLASS('XUIObject', function(me){
 ;
 
 $CLASS('UI', function(){});
+;
+
+$ENUM('UI.EVENT_ID', [
+	'EVENT_TIMER'
+]);
 ;
 
 
@@ -10956,15 +11057,15 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'setName',
 		'getName',
 		'getFrameByName',
-		'getFrmaesByName',
+		'getFramesByName',
 
-		'create',
+		// 'create',
 
-		'generateLayoutParam',
-		'beginUpdateLayoutParam',
-		'endUpdateLayoutParam',
-		'isLayouting',
-		'invalidateLayout'
+		// 'generateLayoutParam',
+		// 'beginUpdateLayoutParam',
+		// 'endUpdateLayoutParam',
+		// 'isLayouting',
+		// 'invalidateLayout'
 	]);
 
 	var m_parent = null;
@@ -10976,11 +11077,15 @@ $CLASS('UI.XFrame', function(me, SELF){
 	var m_name = null;
 	var m_child_frames = [];
 
-	$PUBLIC_FUN_IMPLE('setName', function(){
+	$PUBLIC_FUN_IMPL('setName', function(name){
+		m_name = name;
+	})
+
+	$PUBLIC_FUN_IMPL('getName', function(){
 		return m_name;
 	});
 
-	$PUBLIC_FUN_IMPLE('getFrameByName', function(){
+	$PUBLIC_FUN_IMPL('getFrameByName', function(){
 		if (m_name == name) return me;
 
 		for (var i = 0; i < m_child_frames.length; i++) {
@@ -10991,7 +11096,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 		return null;
 	});
 
-	$PUBLIC_FUN_IMPLE('getFramesByName', function(){
+	$PUBLIC_FUN_IMPL('getFramesByName', function(){
 		var rst = [];
 
 		if (m_name == name) rst.push(me);
@@ -11003,8 +11108,8 @@ $CLASS('UI.XFrame', function(me, SELF){
 		return rst;
 	});
 
+	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 
-	function create(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 		visibility = visibility || UI.XFrame.Visibility.VISIBILITY_NONE;
 
 		beginUpdateLayoutParam(layout);
@@ -11013,10 +11118,10 @@ $CLASS('UI.XFrame', function(me, SELF){
 		setParent(parent);
 
 		setVisibility(visibility);
-	}
+	});
 
-	function beginUpdateLayoutParam() {
-		if (isLayouting()) {
+	$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(){
+		if (me.isLayouting()) {
 			if (!m_delay_layout_param)
 				m_delay_layout_param = me.generateLayoutParam(m_layout_param);
 			return m_delay_layout_param;
@@ -11025,39 +11130,45 @@ $CLASS('UI.XFrame', function(me, SELF){
 				m_layout_param = me.generateLayoutParam();
 			return m_layout_param;
 		}
-	}
+	});
 
-	function endUpdateLayoutParam() {
-		// TODO: delay layout part. 
-
-		if (m_parent) m_parent.invalidateLayout();
-	}
-
-	function isLayouting() {
-		if (m_parent)
-			return m_parent.isLayouting();
-
-		return false;
-	}
-
-	function invalidateLayout() {
-
-	}
+	$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function() {
 
 
-	function generateLayoutParam(copy_from_or_xml_or_null) {
+	});
+
+
+	// function endUpdateLayoutParam() {
+	// 	// TODO: delay layout part. 
+
+	// 	if (m_parent) m_parent.invalidateLayout();
+	// }
+
+	// function isLayouting() {
+	// 	if (m_parent)
+	// 		return m_parent.isLayouting();
+
+	// 	return false;
+	// }
+
+	// function invalidateLayout() {
+
+	// }
+
+
+	// function generateLayoutParam(copy_from_or_xml_or_null) {
 		
-		if (!copy_from_or_xml_or_null)
-			return new SELF.LayoutParam();
+	// 	if (!copy_from_or_xml_or_null)
+	// 		return new SELF.LayoutParam();
 
-		if (copy_from_or_xml_or_null.instanceOf &&
-			copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
-			var copy_from = copy_from_or_xml_or_null;
-			return new SELF.LayoutParam(copy_from);			
-		}	
+	// 	if (copy_from_or_xml_or_null.instanceOf &&
+	// 		copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
+	// 		var copy_from = copy_from_or_xml_or_null;
+	// 		return new SELF.LayoutParam(copy_from);			
+	// 	}	
 
-		// TODO : XML part
-	}
+	// 	// TODO : XML part
+	// }
 
 });
 
@@ -11071,7 +11182,7 @@ $ENUM('UI.XFrame.Visibility',
 $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 
 
-	var public_list = {
+	var public_var_list = {
 		'x' 		: 0,
 		'y' 		: 0,
 		'width' 	: 0,
@@ -11083,7 +11194,7 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 		'margin_bottom'		: 0
 	};
 
-	$PUBLIC(public_list);
+	$PUBLIC_VAR(public_var_list);
 
 
 	$CONSTRUCTOR(function(xml_or_layout_param){
@@ -11094,10 +11205,8 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 			xml_or_layout_param.instanceOf(SELF)) {
 
 			var other = xml_or_layout_param;
-			if (other.classobj != SELF)
-				other = other.$PARENT(SELF.classname);
 
-			$.each(public_list, function(i,v){
+			$.each(public_var_list, function(i,v){
 				me[i] = other[i];
 			});
 		}	
@@ -11113,6 +11222,71 @@ $ENUM('UI.XFrame.LayoutParam.SpecialMetrics',
 	'METRIC_REACH_PARENT',
 	'METRIC_WRAP_CONTENT'
 ]);
+;
+
+(function(){
+
+
+	$CLASS('UI.XEventService', function(me, SELF){
+
+		$PUBLIC_FUN([
+			'postFrameEvent',
+			'hasPendingEvent',
+			'setTimer',
+			'killTimer'
+		]);
+
+		var event_to_post = [];
+
+		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
+			event_to_post.push({'frame' : frame, 'event' : event});
+			schedulePostEvent();
+		});
+
+		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
+			for (var i = 0; i < event_to_post.length; i++) {
+				if (event_to_post[i].event.id == id)
+					return true;
+			}
+			return false;
+		});
+
+		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
+			return setInterval(function(){
+				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
+			}, elapse);
+		});
+
+		$PUBLIC_FUN_IMPL('killTimer', function(id) {
+			clearInterval(id);
+		});
+
+		function schedulePostEvent() {
+			setTimeout(function(){
+				$.each(event_to_post, function(i,v){
+					var frame = v.frame;
+					var event = v.event;
+					frame.$DISPATCH_MESSAGE('EVENT', event);
+				});
+				event_to_post = [];
+			}, 0);
+		}
+
+	})
+	.$STATIC({
+		'instance' : eventServiceInstance			
+	});
+
+	var event_service_instance;
+	function eventServiceInstance() {
+		if (!event_service_instance)
+			event_service_instance = new UI.XEventService();
+		return event_service_instance;
+	}
+
+})();
+
+
 ;
 
 (function(){

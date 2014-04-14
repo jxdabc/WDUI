@@ -47,8 +47,7 @@
 			if (!this || !this.classobj)
 				return factory.apply(new empty_obj_factory(), arguments);
 
-			var me = this;
-			var my_arguments = arguments;
+			var my_arguments = Array.prototype.slice.call(arguments, 0);
 
 			// $.each(this, function(i, v){
 			// 	if (!me.hasOwnProperty(i)) return;
@@ -61,84 +60,19 @@
 			scope(polymorphism_obj, factory);
 			var object_info = object_info_stack.pop();
 
-			// Parent construction. 
-			var extend_list_with_args = {};
-			$.each(extend_list || [], function(i,v){
-				extend_list_with_args[v.classname] = [];
-			});
-			$.each(object_info.parent_constructor_list || [], function(i,v){
-				v.apply(global, 
-					[extend_list_with_args].concat(Array.prototype.slice.call(my_arguments, 0)));
-			});
-			var parent_list = buildParent(this, extend_list, extend_list_with_args);
+			var parent_list = buildParent(my_arguments, object_info, this, extend_list);
 
-			// Member initialization. 
-			$.each(object_info.public_var_list || [], function(i,v){
-				$.each(v, function(ii,vv){
-					makeProperty(me, ii, vv, true);
-				});
-			});
-			$.each(object_info.public_fun_list || [], function(i,v){
-				$.each(v, function(ii,vv){
-					if (!object_info.public_fun_impl_map[vv])
-						throw new Exception('XUIClass::PFNI', 
-							'XUIClass: Public function ' + vv + ' not implemented. ');
-					makeProperty(me, vv, object_info.public_fun_impl_map[vv], false);
-				});
-			});
+			memberInitialize(object_info, this);
+			
+			addMessageHandingMechanism(object_info, this, parent_list);
 
-			// $ME reference definition. 
-			var real_obj = this;
-			Object.defineProperty(this, '$ME', 
-			{
-				enumerable : false,
-				configurable : false,
-				set: function (val) 
-				{
-					real_obj = val;
-					$.each(parent_list, function(i,v){
-						v.obj.$ME = val;
-					});
-				},
-				get: function () 
-				{
-					return real_obj;			
-				}
-			});
+			buildThisReference(this, parent_list);
 
-			// polymorphism_obj definition. 
-			$.each(this, function(i,v){
-				if (!me.hasOwnProperty(i)) return;
-				if (typeof v != "function")
-					makeReference(polymorphism_obj, i, me, i);
-				else
-				{
-					Object.defineProperty(polymorphism_obj, i, 
-					{
-						enumerable : true,
-						configurable : false,
-						set: function (val) 
-						{
-							me.$ME[i] = val;
-						},
-						get: function () 
-						{
-							return me.$ME[i];
-						}
-					});
-				}
+			buildPolymophismObject(this, polymorphism_obj);
 
-				makeReference(polymorphism_obj, '$ME', me, '$ME');
-				makeReference(polymorphism_obj, '$PARENT', me, '$PARENT');
-			});
+			construct(object_info, my_arguments);
 
-			// Self construction. 
-			$.each(object_info.constructor_list || [], function(i,v){
-				v.apply(global, my_arguments);
-			});
-
-			// $ME reference initialization. 
-			this.$ME = this;
+			this.$THIS = this;
 
 			return this;
 		}
@@ -193,6 +127,30 @@
 		info.constructor_list.push(fn);
 	}
 
+	global.$MESSAGE_MAP = function(name, items) {
+		var info = object_info_stack.last();
+		info.message_map = info.message_map || {};
+		info.message_map[name] = items;
+	}
+
+	global.$MAP = function(id, fun) {
+		return {'id' : id, 'handler' : fun};		
+	}
+
+	global.$CHAIN = function(direct_parent) {
+
+		if (typeof direct_parent != 'string')
+			direct_parent = direct_parent.classname;
+
+		return {'chain' : direct_parent};
+	}
+
+	global.$MESSAGE_HANDLER = function(name, fn) {
+		var info = object_info_stack.last();
+		info.message_handlers = info.message_handlers || {};
+		info.message_handlers[name] = fn;
+	}
+
 	global.$ABSTRACT = function() { 
 		throw new Exception('XUIClass::AFNI', 
 			'Abstract funtion not implemented. '); 
@@ -224,7 +182,16 @@
 		classobj.$STATIC(global_list);
 	}
 
-	function buildParent(object, extend_list, extend_list_with_args) {
+	function buildParent(args, object_info, object, extend_list) {
+
+		var extend_list_with_args = {};
+		$.each(extend_list || [], function(i,v){
+			extend_list_with_args[v.classname] = [];
+		});
+		$.each(object_info.parent_constructor_list || [], function(i,v){
+			v.apply(global, 
+				[extend_list_with_args].concat(args));
+		});
 
 		var parent_list =[];
 
@@ -248,6 +215,12 @@
 			configurable : false,
 			writable : false,
 			value : function (name) {
+				if (typeof name == 'undefined')
+					return parent_list;
+
+				if (typeof name != "string")
+					name = name.classname;
+
 				var direct_parent = null;
 				$.each(parent_list, function(i,v){
 					if (direct_parent) return;
@@ -264,6 +237,129 @@
 		});
 
 		return parent_list;
+	}
+
+	function memberInitialize(object_info, object) {
+		$.each(object_info.public_var_list || [], function(i,v){
+			$.each(v, function(ii,vv){
+				makeProperty(object, ii, vv, true);
+			});
+		});
+		$.each(object_info.public_fun_list || [], function(i,v){
+			$.each(v, function(ii,vv){
+				if (!object_info.public_fun_impl_map[vv])
+					throw new Exception('XUIClass::PFNI', 
+						'XUIClass: Public function ' + vv + ' not implemented. ');
+				makeProperty(object, vv, object_info.public_fun_impl_map[vv], false);
+			});
+		});
+	}
+
+	function addMessageHandingMechanism(object_info, object, parent_list) {
+		var maps = object_info.message_map;
+		var handlers = object_info.message_handlers;
+
+		$.each(maps || {}, function(i,v){
+			$.each(v, function(i,v){
+				if (v.chain) {
+					var parent_name = v.chain;
+					var parent = null;
+					$.each(parent_list, function(i,v){
+						if (parent) return;
+						if (v.name == parent_name)
+							parent = v.obj;
+					});
+
+					if (!parent)
+						throw new Exception('XUIClass::NDP', 
+							'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
+
+					v.chain = parent;
+				} 
+				else if (!handlers[v.handler])
+					throw new 
+						Exception('XUIClass::MHND', 'XUIClass: Message handler ' + v.handler + ' not defined. ');
+			});
+		});
+
+		Object.defineProperty(object, '$DISPATCH_MESSAGE', {
+			enumerable : false,
+			configurable : false,
+			writable : false,
+			value : function (type, msg) {
+				var map = maps && maps[type];
+				var handled = false;
+				if (!map) {
+					$.each(parent_list, function(i,v) {
+						if (handled) return;
+						handled = v.obj.$DISPATCH_MESSAGE(type, msg);
+					});
+				} else {
+					$.each(map, function(i,v){
+						if (handled) return;
+						if (v.chain)
+							handled = v.chain.$DISPATCH_MESSAGE(type, msg);
+						else if (v.id == msg.id)
+							handled = handlers[v.handler](msg);
+					});
+				}
+				return handled;
+			}
+		});
+	}
+
+	function buildThisReference(object, parent_list) {
+		var real_obj = object;
+		Object.defineProperty(object, '$THIS', 
+		{
+			enumerable : false,
+			configurable : false,
+			set: function (val) 
+			{
+				real_obj = val;
+				$.each(parent_list, function(i,v){
+					v.obj.$THIS = val;
+				});
+			},
+			get: function () 
+			{
+				return real_obj;			
+			}
+		});
+	}
+
+	function buildPolymophismObject(object, polymorphism_obj) {
+		$.each(object, function(i,v){
+			if (!object.hasOwnProperty(i)) return;
+			if (typeof v != "function")
+				makeReference(polymorphism_obj, i, object, i);
+			else
+			{
+				Object.defineProperty(polymorphism_obj, i, 
+				{
+					enumerable : true,
+					configurable : false,
+					set: function (val) 
+					{
+						object.$THIS[i] = val;
+					},
+					get: function () 
+					{
+						return object.$THIS[i];
+					}
+				});
+			}
+		});
+
+		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
+		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
+		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+	}
+
+	function construct(object_info, args) {
+		$.each(object_info.constructor_list || [], function(i,v){
+			v.apply(global, args);
+		});
 	}
 
 

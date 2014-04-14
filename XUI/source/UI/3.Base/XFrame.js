@@ -7,15 +7,15 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'setName',
 		'getName',
 		'getFrameByName',
-		'getFrmaesByName',
+		'getFramesByName',
 
-		'create',
+		// 'create',
 
-		'generateLayoutParam',
-		'beginUpdateLayoutParam',
-		'endUpdateLayoutParam',
-		'isLayouting',
-		'invalidateLayout'
+		// 'generateLayoutParam',
+		// 'beginUpdateLayoutParam',
+		// 'endUpdateLayoutParam',
+		// 'isLayouting',
+		// 'invalidateLayout'
 	]);
 
 	var m_parent = null;
@@ -27,11 +27,15 @@ $CLASS('UI.XFrame', function(me, SELF){
 	var m_name = null;
 	var m_child_frames = [];
 
-	$PUBLIC_FUN_IMPLE('setName', function(){
+	$PUBLIC_FUN_IMPL('setName', function(name){
+		m_name = name;
+	})
+
+	$PUBLIC_FUN_IMPL('getName', function(){
 		return m_name;
 	});
 
-	$PUBLIC_FUN_IMPLE('getFrameByName', function(){
+	$PUBLIC_FUN_IMPL('getFrameByName', function(){
 		if (m_name == name) return me;
 
 		for (var i = 0; i < m_child_frames.length; i++) {
@@ -42,7 +46,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 		return null;
 	});
 
-	$PUBLIC_FUN_IMPLE('getFramesByName', function(){
+	$PUBLIC_FUN_IMPL('getFramesByName', function(){
 		var rst = [];
 
 		if (m_name == name) rst.push(me);
@@ -54,8 +58,8 @@ $CLASS('UI.XFrame', function(me, SELF){
 		return rst;
 	});
 
+	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 
-	function create(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 		visibility = visibility || UI.XFrame.Visibility.VISIBILITY_NONE;
 
 		beginUpdateLayoutParam(layout);
@@ -64,10 +68,10 @@ $CLASS('UI.XFrame', function(me, SELF){
 		setParent(parent);
 
 		setVisibility(visibility);
-	}
+	});
 
-	function beginUpdateLayoutParam() {
-		if (isLayouting()) {
+	$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(){
+		if (me.isLayouting()) {
 			if (!m_delay_layout_param)
 				m_delay_layout_param = me.generateLayoutParam(m_layout_param);
 			return m_delay_layout_param;
@@ -76,39 +80,45 @@ $CLASS('UI.XFrame', function(me, SELF){
 				m_layout_param = me.generateLayoutParam();
 			return m_layout_param;
 		}
-	}
+	});
 
-	function endUpdateLayoutParam() {
-		// TODO: delay layout part. 
-
-		if (m_parent) m_parent.invalidateLayout();
-	}
-
-	function isLayouting() {
-		if (m_parent)
-			return m_parent.isLayouting();
-
-		return false;
-	}
-
-	function invalidateLayout() {
-
-	}
+	$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function() {
 
 
-	function generateLayoutParam(copy_from_or_xml_or_null) {
+	});
+
+
+	// function endUpdateLayoutParam() {
+	// 	// TODO: delay layout part. 
+
+	// 	if (m_parent) m_parent.invalidateLayout();
+	// }
+
+	// function isLayouting() {
+	// 	if (m_parent)
+	// 		return m_parent.isLayouting();
+
+	// 	return false;
+	// }
+
+	// function invalidateLayout() {
+
+	// }
+
+
+	// function generateLayoutParam(copy_from_or_xml_or_null) {
 		
-		if (!copy_from_or_xml_or_null)
-			return new SELF.LayoutParam();
+	// 	if (!copy_from_or_xml_or_null)
+	// 		return new SELF.LayoutParam();
 
-		if (copy_from_or_xml_or_null.instanceOf &&
-			copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
-			var copy_from = copy_from_or_xml_or_null;
-			return new SELF.LayoutParam(copy_from);			
-		}	
+	// 	if (copy_from_or_xml_or_null.instanceOf &&
+	// 		copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
+	// 		var copy_from = copy_from_or_xml_or_null;
+	// 		return new SELF.LayoutParam(copy_from);			
+	// 	}	
 
-		// TODO : XML part
-	}
+	// 	// TODO : XML part
+	// }
 
 });
 
@@ -122,7 +132,7 @@ $ENUM('UI.XFrame.Visibility',
 $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 
 
-	var public_list = {
+	var public_var_list = {
 		'x' 		: 0,
 		'y' 		: 0,
 		'width' 	: 0,
@@ -134,7 +144,7 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 		'margin_bottom'		: 0
 	};
 
-	$PUBLIC(public_list);
+	$PUBLIC_VAR(public_var_list);
 
 
 	$CONSTRUCTOR(function(xml_or_layout_param){
@@ -145,10 +155,8 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 			xml_or_layout_param.instanceOf(SELF)) {
 
 			var other = xml_or_layout_param;
-			if (other.classobj != SELF)
-				other = other.$PARENT(SELF.classname);
 
-			$.each(public_list, function(i,v){
+			$.each(public_var_list, function(i,v){
 				me[i] = other[i];
 			});
 		}	

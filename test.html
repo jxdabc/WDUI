@@ -9,11 +9,50 @@
 
 <script type="text/javascript">
 
+	$CLASS('TEST', function(me){});
+
+	// message test
+	(function(){
+
+		$CLASS('TEST.MessageTestBase', function(me, SELF){
+
+			$MESSAGE_MAP('EVENT', 
+			[
+				$MAP(UI.EVENT_ID.EVENT_TIMER, 'mytimer')
+			]);
+
+			$MESSAGE_HANDLER('mytimer', function(msg){
+				console.log(SELF.classname, msg);
+//				return true;
+			});
+		});
+
+
+		$CLASS('TEST.MesageTest', 
+		$EXTENDS(TEST.MessageTestBase),
+		function(me, SELF){
+
+			$MESSAGE_MAP('EVENT',
+			[
+				$CHAIN(TEST.MessageTestBase),
+				$MAP(UI.EVENT_ID.EVENT_TIMER, 'mytimer')
+			]);
+
+			$MESSAGE_HANDLER('mytimer', function(msg){
+				console.log(SELF.classname, msg);
+				return true;
+			});
+
+		});
+
+		var obj = new TEST.MesageTest();
+		UI.XEventService.instance().setTimer(obj, 1000);
+
+	})();
+
 
 	// Test Inheritance
 	(function(){
-
-		$CLASS('TEST', function(me){});
 
 		$CLASS('TEST.BASE1', function(me) {
 
@@ -27,6 +66,7 @@
 			});
 
 			$PUBLIC_FUN({
+				'pr' : function() {return 'BASE1::PR'},
 				'd' : function () {return 'BASE1::d';},
 				'e' : function () {return 'BASE1::e';},
 				'f' : function () {return 'BASE1::f';},
@@ -57,6 +97,7 @@
 			});
 
 			$PUBLIC_FUN({
+				'pr' : function() {return 'BASE2::PR'},
 				'd' : function () {return 'BASE2::d';}
 			});
 		})
@@ -77,7 +118,12 @@
 			});
 
 			$PUBLIC_FUN({
-				'd' : function () {return 'DRIVED1::d';}
+				'd' : function () {return 'DRIVED1::d';},
+				'mypr'	  : function () {return me.pr();},
+				'thispr'  : function () {return me.$THIS.pr();},
+				'base1pr' : function () {return me.$PARENT('TEST.BASE1').pr(); },
+				'base2pr' : function () {return me.$PARENT('TEST.BASE2').pr(); },
+				'pr' : function() {return 'DRIVED1::PR'}
 			})
 
 		})
@@ -95,6 +141,7 @@
 			});
 
 			$PUBLIC_FUN({
+				'pr' : function() {return 'DRIVED2::PR'},
 				'e'  : function () {return 'DRIVED2::e';},
 				'nf' : function () {return 'DRIVED2::nf';}
 			})
@@ -117,7 +164,7 @@
 
 		// parent
 		console.log(obj.$PARENT('TEST.DRIVED1').classobj.classname === 'TEST.DRIVED1');
-		console.log(obj.$PARENT('TEST.BASE2').classobj.classname === 'TEST.BASE2');
+		console.log(obj.$PARENT(TEST.BASE2).classobj.classname === 'TEST.BASE2');
 		console.log(obj.$PARENT('TEST.BASE1').classobj.classname === 'TEST.BASE1');
 		console.log(obj.$PARENT('XUIObject').classobj.classname === 'XUIObject');
 
@@ -132,7 +179,19 @@
 		console.log(obj.po1() === 'DRIVED2::e');
 		console.log(obj.po2() === 30);
 
-		console.log(obj.$PARENT('XUIObject').toString() === 'XUIObject: XUIObject');
+		// $THIS reference
+		console.log(obj.$THIS === obj);
+		console.log(obj.$PARENT('TEST.DRIVED1').$THIS === obj);
+		console.log(obj.$PARENT('TEST.BASE1').$THIS === obj);
+		console.log(obj.$PARENT('TEST.BASE2').$THIS === obj);
+		
+
+		// $THIS reference && $PARENT reference inside a class. 
+		console.log(obj.$PARENT('XUIObject').toString() === 'XUIObject: TEST.DRIVED2');
+		console.log(obj.pr() === 'DRIVED2::PR');
+		console.log(obj.thispr() === 'DRIVED2::PR');
+		console.log(obj.base1pr() === 'BASE1::PR');
+		console.log(obj.base2pr() === 'BASE2::PR');
 
 		// parent modification
 		obj.$PARENT('TEST.BASE2').b = 'abc';
@@ -157,6 +216,9 @@
 
 		obj.$PARENT('TEST.BASE2').md2 = 'alalal';
 		console.log(obj.md2 === 'alalal');
+
+		obj.f = 'abc';
+		console.log(typeof obj.f == 'function');
 
 
 		// private member
