@@ -95,7 +95,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 
 	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 
-		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
+		visibility = visibility || SELF.VISIBILITY.VISIBILITY_NONE;
 
 		beginUpdateLayoutParam(layout);
 		endUpdateLayoutParam();
@@ -217,7 +217,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 				'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_VISIBILITY_CHANGED,
 			 	'new' : visibility,
 			 	'old' : old_visibility,
-			};
+			});
 
 	});
 
@@ -316,6 +316,12 @@ $CLASS('UI.XFrame', function(me, SELF){
 		});
 	});
 
+	$PUBLIC_FUN_IMPL('throwNotification', function() {
+
+
+
+	});
+
 	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
 		if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
 			return;
@@ -376,13 +382,19 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 
 });
 
+$ENUM('UI.XFrame.VISIBILITY', [
+	'VISIBILITY_SHOW',
+	'VISIBILITY_HIDE',
+	'VISIBILITY_NONE'
+]);
+
 $ENUM('UI.XFrame.LayoutParam.SpecialMetrics', 
 [
 	'METRIC_REACH_PARENT',
 	'METRIC_WRAP_CONTENT'
 ]);
 
-$EUM('UI.XFrame.NOTIFICATION',
+$ENUM('UI.XFrame.NOTIFICATION',
 [
 	'NOTIFICATION_FRAME_VISIBILITY_CHANGED',
 	'NOTIFICAITON_FRAME_RECT_CHANGED',

@@ -11069,6 +11069,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'getVisibility',
 
 		'invalidateRect',
+		'invalidateAfterLayout',
 
 		'getRect',
 		'setRect',
@@ -11083,8 +11084,12 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'insertFrame',
 		'removeFrame',
 		'setParent',
-		'OnDetachedFromParent',
-		'OnAttachedToParent',
+		'onDetachedFromParent',
+		'onAttachedToParent',
+
+		'throwNotification',
+
+		'childToParent',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
@@ -11092,17 +11097,24 @@ $CLASS('UI.XFrame', function(me, SELF){
 		$MAP(UI.EVENT_ID.EVENT_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout')
 	]);
 
-	var m_parent = null;
-
+	var m_layout_invalid = false;
 	var m_layout_param 			= null;
 	var m_delay_layout_param 	= null;
-
 	var m_delay_update_layout_param_scheduled = false;
-
-	var m_layout_invalid = false;
-
+	var m_need_invalidate_after_layout = false;
+	var m_rect = new UI.Rect();
+	
 	var m_name = null;
+
+	var m_parent = null;
 	var m_child_frames = [];
+
+	var m_visibility = SELF.VISIBILITY.VISIBILITY_NONE;
+
+	m_background = null;
+	m_mouseover_layer = null;
+	m_mousedown_layer = null;
+	m_selected_layer = null;
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
 		m_name = name;
@@ -11137,7 +11149,7 @@ $CLASS('UI.XFrame', function(me, SELF){
 
 	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/) {
 
-		visibility = visibility || UI.XFrame.Visibility.VISIBILITY_NONE;
+		visibility = visibility || SELF.VISIBILITY.VISIBILITY_NONE;
 
 		beginUpdateLayoutParam(layout);
 		endUpdateLayoutParam();
@@ -11189,13 +11201,100 @@ $CLASS('UI.XFrame', function(me, SELF){
 			return new SELF.LayoutParam(copy_from_or_xml_or_null);
 	});
 
-	$PUBLIC_FUN_IMPL('setParent', function(parent){
+	$PUBLIC_FUN_IMPL('getRect', function(){
+		return m_rect;
+	});
+
+	$PUBLIC_FUN_IMPL('setRect', function(new_rect) {
+
+		if (m_rect == new_rect) return;
+
+		var old_rect = new UI.Rect(m_rect);
+		m_rect = new_rect;
+
+		var rect_draw_area = new UI.Rect(0, 0, new_rect.width(), new_rect.height());
+
+		if (m_background) m_background.setDstRect(rect_draw_area);
+		if (m_mouseover_layer) m_mouseover_layer.setDstRect(rect_draw_area);
+		if (m_mousedown_layer) m_mousedown_layer.setDstRect(rect_draw_area);
+		if (m_selected_layer) m_selected_layer.setDstRect(rect_draw_area);
+
+		if (m_visibility == SELF.VISIBILITY.VISIBILITY_SHOW) {
+			if (m_parent) {
+				m_parent.invalidateRect(old_rect);
+				m_parent.invalidateRect(new_rect);
+			} else {
+				if (old_rect.width() != new_rect.width() ||
+					old_rect.height() != new_rect.height())
+					me.invalidateRect();
+			}
+		}
+
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED,
+				'new' : new_rect,
+				'old' : old_rect,
+			});
+	});
+
+	$PUBLIC_FUN_IMPL('setVisibility', function(visibility){
+		
+		if (m_visibility == visibility) return;
+
+		var old_visibility = m_visibility;
+		m_visibility = visibility;
+
+		switch (visibility) {
+			case SELF.VISIBILITY.VISIBILITY_SHOW:
+				if (old_visibility == SELF.VISIBILITY.VISIBILITY_NONE
+					&& m_parent) {
+					m_parent.invalidateLayout();
+					me.invalidateAfterLayout();
+				} else me.invalidateRect();
+				break;
+			case SELF.VISIBILITY.VISIBILITY_HIDE:
+				if (old_visibility == SELF.VISIBILITY.VISIBILITY_NONE) 
+					if (m_parent) m_parent.invalidateLayout();
+				else
+					if (m_parent) m_parent.invalidateRect(m_rect);
+				break;
+			case SELF.VISIBILITY.VISIBILITY_NONE:
+				if (old_visibility == SELF.VISIBILITY.VISIBILITY_SHOW)
+					if (m_parent) m_parent.invalidateRect(m_rect);
+				if (m_parent) m_parent.invalidateLayout();
+				break;
+		}
+
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_VISIBILITY_CHANGED,
+			 	'new' : visibility,
+			 	'old' : old_visibility,
+			});
 
 	});
 
-	$PUBLIC_FUN_IMPL('setVisibility', function(){
-
+	$PUBLIC_FUN_IMPL('getVisibility', function(){
+		return m_visibility;
 	});
+
+	$PUBLIC_FUN_IMPL('invalidateRect', function(rc){
+		if (m_visibility != SELF.VISIBILITY.VISIBILITY_SHOW) return;
+		if (rc.isEmpty()) return;
+
+		var rect_real = rc.intersect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
+		if (rect_real.isEmpty()) return;
+
+		if (!m_parent) return;
+		
+		m_parent.invalidateRect(me.childToParent(rc));
+	});
+
+	$PUBLIC_FUN_IMPL('invalidateAfterLayout', function(){
+		m_need_invalidate_after_layout = true;
+	});
+
 
 	$PUBLIC_FUN_IMPL('addFrame', function(frame){
 		return me.insertFrame(frame, m_child_frames.length);
@@ -11208,12 +11307,15 @@ $CLASS('UI.XFrame', function(me, SELF){
 		if (index > m_child_frames.length) index = m_child_frames.length;
 
 		m_child_frames.splice(index, 0, frame);
-		frame.OnAttachedToParent();
+		frame.onAttachedToParent(me.$THIS);
 
 		switch (frame.getVisibility()) {
 			case SELF.VISIBILITY.VISIBILITY_HIDE:
+				me.invalidateLayout();
+				break;
 			case SELF.VISIBILITY.VISIBILITY_SHOW:
 				me.invalidateLayout();
+				frame.invalidateAfterLayout();
 				break;
 		}
 	});
@@ -11241,6 +11343,37 @@ $CLASS('UI.XFrame', function(me, SELF){
 		}
 
 		return frame;
+	});
+
+	$PUBLIC_FUN_IMPL('setParent', function (parent){
+		if (m_parent == parent) return;
+		if (m_parent) m_parent.removeFrame(me.$THIS);
+		if (parent) parent.addFrame(me.$THIS);
+	});
+
+	$PUBLIC_FUN_IMPL('onAttachedToParent', function(parent){
+		if (m_parent) setParent(NULL);
+		m_parent = parent;
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_ATTACHED_TO_PARENT,
+				'parent' : parent
+			});
+	});
+
+	$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
+		var parent = m_parent;
+		m_parent = NULL;
+		me.throwNotification({
+			'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_DETACHED_FROM_PARENT,
+			'parent' : parent
+		});
+	});
+
+	$PUBLIC_FUN_IMPL('throwNotification', function() {
+
+
+
 	});
 
 	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
@@ -11303,11 +11436,25 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 
 });
 
+$ENUM('UI.XFrame.VISIBILITY', [
+	'VISIBILITY_SHOW',
+	'VISIBILITY_HIDE',
+	'VISIBILITY_NONE'
+]);
+
 $ENUM('UI.XFrame.LayoutParam.SpecialMetrics', 
 [
 	'METRIC_REACH_PARENT',
 	'METRIC_WRAP_CONTENT'
 ]);
+
+$ENUM('UI.XFrame.NOTIFICATION',
+[
+	'NOTIFICATION_FRAME_VISIBILITY_CHANGED',
+	'NOTIFICAITON_FRAME_RECT_CHANGED',
+	'NOTIFICATION_FRAME_ATTACHED_TO_PARENT',
+	'NOTIFICATION_FRAME_DETACHED_FROM_PARENT',
+])
 ;
 
 (function(){
@@ -12078,7 +12225,9 @@ function(me, SELF){
 ;
 
 
-$CLASS('UI.XCanvasText', function(me, SELF){
+$CLASS('UI.XCanvasText', 
+EXTENDS('UI.IXText'),
+function(me, SELF){
 
 	$PUBLIC_FUN([
 		'draw',
