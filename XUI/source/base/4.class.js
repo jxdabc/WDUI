@@ -54,10 +54,10 @@
 			// 	throw new Exception('XUIClass::ONE', 'XUIClass: Object to be constructed is not empty. ');
 			// });
 
-			var polymorphism_obj = new empty_obj_factory();
+			var protected_this_reference = new empty_obj_factory();
 
 			object_info_stack.push({});
-			scope(polymorphism_obj, factory);
+			scope(protected_this_reference, factory);
 			var object_info = object_info_stack.pop();
 
 			var parent_list = buildParent(my_arguments, object_info, this, extend_list);
@@ -68,7 +68,7 @@
 
 			buildThisReference(this, parent_list);
 
-			buildPolymophismObject(this, polymorphism_obj);
+			buildProtectedThisReferenceObject(this, protected_this_reference);
 
 			construct(object_info, my_arguments);
 
@@ -328,34 +328,34 @@
 		});
 	}
 
-	function buildPolymophismObject(object, polymorphism_obj) {
+	function buildProtectedThisReferenceObject(object, protected_this_reference) {
 		$.each(object, function(i,v){
 			if (!object.hasOwnProperty(i)) return;
 			if (typeof v != "function")
-				makeReference(polymorphism_obj, i, object, i);
+				makeReference(protected_this_reference, i, object, i);
 			else
 			{
-				Object.defineProperty(polymorphism_obj, i, 
+				Object.defineProperty(protected_this_reference, i, 
 				{
 					enumerable : true,
 					configurable : false,
 					set: function (val) 
 					{
-						polymorphism_obj.$THIS[i] = val;
+						protected_this_reference.$THIS[i] = val;
 					},
 					get: function () 
 					{
-						return polymorphism_obj.$THIS[i];
+						return protected_this_reference.$THIS[i];
 					}
 				});
 			}
 		});
 
-		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
-		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
-		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+		makeReference(protected_this_reference, '$THIS', object, '$THIS');
+		makeReference(protected_this_reference, '$PARENT', object, '$PARENT');
+		makeReference(protected_this_reference, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
 
-		polymorphism_obj.$SELFOBJ = object;
+		protected_this_reference.$SELFOBJ = object;
 	}
 
 	function construct(object_info, args) {

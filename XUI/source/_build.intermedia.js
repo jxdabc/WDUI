@@ -10416,10 +10416,10 @@ String.prototype.format = function()
 			// 	throw new Exception('XUIClass::ONE', 'XUIClass: Object to be constructed is not empty. ');
 			// });
 
-			var polymorphism_obj = new empty_obj_factory();
+			var protected_this_reference = new empty_obj_factory();
 
 			object_info_stack.push({});
-			scope(polymorphism_obj, factory);
+			scope(protected_this_reference, factory);
 			var object_info = object_info_stack.pop();
 
 			var parent_list = buildParent(my_arguments, object_info, this, extend_list);
@@ -10430,7 +10430,7 @@ String.prototype.format = function()
 
 			buildThisReference(this, parent_list);
 
-			buildPolymophismObject(this, polymorphism_obj);
+			buildProtectedThisReferenceObject(this, protected_this_reference);
 
 			construct(object_info, my_arguments);
 
@@ -10690,34 +10690,34 @@ String.prototype.format = function()
 		});
 	}
 
-	function buildPolymophismObject(object, polymorphism_obj) {
+	function buildProtectedThisReferenceObject(object, protected_this_reference) {
 		$.each(object, function(i,v){
 			if (!object.hasOwnProperty(i)) return;
 			if (typeof v != "function")
-				makeReference(polymorphism_obj, i, object, i);
+				makeReference(protected_this_reference, i, object, i);
 			else
 			{
-				Object.defineProperty(polymorphism_obj, i, 
+				Object.defineProperty(protected_this_reference, i, 
 				{
 					enumerable : true,
 					configurable : false,
 					set: function (val) 
 					{
-						polymorphism_obj.$THIS[i] = val;
+						protected_this_reference.$THIS[i] = val;
 					},
 					get: function () 
 					{
-						return polymorphism_obj.$THIS[i];
+						return protected_this_reference.$THIS[i];
 					}
 				});
 			}
 		});
 
-		makeReference(polymorphism_obj, '$THIS', object, '$THIS');
-		makeReference(polymorphism_obj, '$PARENT', object, '$PARENT');
-		makeReference(polymorphism_obj, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
+		makeReference(protected_this_reference, '$THIS', object, '$THIS');
+		makeReference(protected_this_reference, '$PARENT', object, '$PARENT');
+		makeReference(protected_this_reference, '$DISPATCH_MESSAGE', object, '$DISPATCH_MESSAGE');
 
-		polymorphism_obj.$SELFOBJ = object;
+		protected_this_reference.$SELFOBJ = object;
 	}
 
 	function construct(object_info, args) {
@@ -11065,11 +11065,31 @@ $CLASS('UI.XFrame', function(me, SELF){
 
 		'create',
 
+		'setVisibility',
+		'getVisibility',
+
+		'invalidateRect',
+
+		'getRect',
+		'setRect',
+
 		'generateLayoutParam',
 		'beginUpdateLayoutParam',
 		'endUpdateLayoutParam',
 		'isLayouting',
-		'invalidateLayout'
+		'invalidateLayout',
+
+		'addFrame',
+		'insertFrame',
+		'removeFrame',
+		'setParent',
+		'OnDetachedFromParent',
+		'OnAttachedToParent',
+	]);
+
+	$MESSAGE_MAP('EVENT', 
+	[
+		$MAP(UI.EVENT_ID.EVENT_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout')
 	]);
 
 	var m_parent = null;
@@ -11078,6 +11098,8 @@ $CLASS('UI.XFrame', function(me, SELF){
 	var m_delay_layout_param 	= null;
 
 	var m_delay_update_layout_param_scheduled = false;
+
+	var m_layout_invalid = false;
 
 	var m_name = null;
 	var m_child_frames = [];
@@ -11151,43 +11173,87 @@ $CLASS('UI.XFrame', function(me, SELF){
 		}
 
 		if (m_parent) m_parent.invalidateLayout();
-
-		return;
 	});
 
+	$PUBLIC_FUN_IMPL('isLayouting', function() {
+		if (m_parent) return m_parent.isLayouting();
+		return false;
+	});
 
-	// function endUpdateLayoutParam() {
-	// 	// TODO: delay layout part. 
+	$PUBLIC_FUN_IMPL('invalidateLayout', function(){
+		m_layout_invalid = true;
+		if (m_parent) m_parent.invalidateLayout();
+	});
 
-	// 	if (m_parent) m_parent.invalidateLayout();
-	// }
+	$PUBLIC_FUN_IMPL('generateLayoutParam', function(copy_from_or_xml_or_null){
+			return new SELF.LayoutParam(copy_from_or_xml_or_null);
+	});
 
-	// function isLayouting() {
-	// 	if (m_parent)
-	// 		return m_parent.isLayouting();
+	$PUBLIC_FUN_IMPL('setParent', function(parent){
 
-	// 	return false;
-	// }
+	});
 
-	// function invalidateLayout() {
+	$PUBLIC_FUN_IMPL('setVisibility', function(){
 
-	// }
+	});
 
+	$PUBLIC_FUN_IMPL('addFrame', function(frame){
+		return me.insertFrame(frame, m_child_frames.length);
+	});
 
-	// function generateLayoutParam(copy_from_or_xml_or_null) {
-		
-	// 	if (!copy_from_or_xml_or_null)
-	// 		return new SELF.LayoutParam();
+	$PUBLIC_FUN_IMPL('insertFrame', function(frame, index) {
+		if (m_child_frames.indexOf(frame) != -1) return;
 
-	// 	if (copy_from_or_xml_or_null.instanceOf &&
-	// 		copy_from_or_xml_or_null.instanceOf(SELF.LayoutParam)) {
-	// 		var copy_from = copy_from_or_xml_or_null;
-	// 		return new SELF.LayoutParam(copy_from);			
-	// 	}	
+		if (index < 0) index = 0;
+		if (index > m_child_frames.length) index = m_child_frames.length;
 
-	// 	// TODO : XML part
-	// }
+		m_child_frames.splice(index, 0, frame);
+		frame.OnAttachedToParent();
 
+		switch (frame.getVisibility()) {
+			case SELF.VISIBILITY.VISIBILITY_HIDE:
+			case SELF.VISIBILITY.VISIBILITY_SHOW:
+				me.invalidateLayout();
+				break;
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('removeFrame', function (index_or_frame){
+		if (typeof index_or_frame != "number") {
+			var frame = index_or_frame;
+			var index = m_child_frames.indexOf(frame);
+			me.removeFrame(index);
+			return;
+		}
+
+		var index = index_or_frame;
+		var frame = m_child_frames[index];
+
+		m_child_frames.splice(index, 1);
+		frame.onDetachedFromParent();
+
+		switch(frame.getVisibility()) {
+			case SELF.VISIBILITY.VISIBILITY_SHOW:
+				me.invalidateRect(frame.getRect());
+				'nobreak';
+			case SELF.VISIBILITY.VISIBILITY_HIDE:
+				me.invalidateLayout();
+		}
+
+		return frame;
+	});
+
+	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
+		if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
+			return;
+
+		m_delay_update_layout_param_schedule = false;
+
+		m_layout_param = m_delay_layout_param;
+		m_delay_layout_param = null;
+
+		me.endUpdateLayoutParam();
+	});
 });
 
 $ENUM('UI.XFrame.Visibility', 
@@ -11223,6 +11289,8 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 			xml_or_layout_param.instanceOf(SELF)) {
 
 			var other = xml_or_layout_param;
+			if (other.classobj != SELF)
+				other = other.parent(SELF);
 
 			$.each(public_var_list, function(i,v){
 				me[i] = other[i];
