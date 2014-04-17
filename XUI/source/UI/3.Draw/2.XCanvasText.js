@@ -1,9 +1,7 @@
 ;
 
 
-$CLASS('UI.XCanvasText', 
-EXTENDS('UI.IXText'),
-function(me, SELF){
+$CLASS('UI.XCanvasText', function(me, SELF){
 
 	$PUBLIC_FUN([
 		'draw',

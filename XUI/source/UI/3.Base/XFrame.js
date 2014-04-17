@@ -1,7 +1,8 @@
 ;
 
-$CLASS('UI.XFrame', function(me, SELF){
-
+$CLASS('UI.XFrame', 
+$EXTENDS(UI.IXNotificationLister),
+function(me, SELF){
 
 	$PUBLIC_FUN([
 		'setName',
@@ -33,9 +34,16 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
+		'addNotificationListener',
+		'removeNofiticationListener',
 		'throwNotification',
 
 		'childToParent',
+
+		'onNotification',
+		'genRemoteRef',
+		'recycleRemoteRef',
+		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
@@ -57,10 +65,13 @@ $CLASS('UI.XFrame', function(me, SELF){
 
 	var m_visibility = SELF.VISIBILITY.VISIBILITY_NONE;
 
-	m_background = null;
-	m_mouseover_layer = null;
-	m_mousedown_layer = null;
-	m_selected_layer = null;
+	var m_background = null;
+	var m_mouseover_layer = null;
+	var m_mousedown_layer = null;
+	var m_selected_layer = null;
+
+	var m_notification_listener = [];
+	var m_remote_ref = [];
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
 		m_name = name;
@@ -316,10 +327,61 @@ $CLASS('UI.XFrame', function(me, SELF){
 		});
 	});
 
-	$PUBLIC_FUN_IMPL('throwNotification', function() {
+	$PUBLIC_FUN_IMPL('addNotificationListener', function(listener){
+		m_notification_listener.push(listener.genRemoteRef());
+	});
 
+	$PUBLIC_FUN_IMPL('removeNofiticationListener', function(listener){
+		for (var i = 0; i < m_notification_listener.length; i++) {
+			if (m_notification_listener[i].obj == listener) {
+				listener.recycleRemoteRef(m_notification_listener[i]);
+				m_notification_listener.splice(i,1);
+				break;
+			}
+		}
+	});
 
+	$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
+		for (var i = 0; i < m_notification_listener.length; /*no i++*/) {
+			var r = m_notification_listener[i];
+			if (r.obj) {r.obj.onNotification(notification); i++;}
+			else m_notification_listener.splice(i,1);
+		}
+	});
 
+	$PUBLIC_FUN_IMPL('onNotification', function(notification){
+		me.$THIS.$DISPATCH_MESSAGE('NOTIFICATION', notification);
+	});
+
+	$PUBLIC_FUN_IMPL('genRemoteRef', function(){
+		var ref = {'obj' : me.$THIS};
+		m_remote_ref.push(ref);
+	});
+
+	$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
+		var index = m_remote_ref.indexOf(ref);
+		m_remote_ref.splice(index, 1);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		$.each(m_remote_ref, function(i,v){
+			v.obj = null;
+		});
+		m_remote_ref = [];
+	});
+
+	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rc){
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
+			var pt = pt_or_rc;
+			return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
+		}
+
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
+			var rc = pt_or_rc;
+			var new_rect = new UI.Rect(rc);
+			new_rect.offset(m_rect.leftTop());
+			return new_rect;
+		}
 	});
 
 	$MESSAGE_HANDLER('onDelayupdateLayout', function(){

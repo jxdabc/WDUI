@@ -11052,10 +11052,21 @@ $CLASS('UI.Pt', function(me){
 
 
 });
+$CLASS('UI.IXNotificationLister', function(me,SELF){
+
+	$PUBLIC_FUN({
+		'onNotification' 	: $ABSTRACT,
+		'genRemoteRef'		: $ABSTRACT,
+		'recycleRemoteRef' 	: $ABSTRACT,
+		'destroy' 			: $ABSTRACT
+	});
+
+});
 ;
 
-$CLASS('UI.XFrame', function(me, SELF){
-
+$CLASS('UI.XFrame', 
+$EXTENDS(UI.IXNotificationLister),
+function(me, SELF){
 
 	$PUBLIC_FUN([
 		'setName',
@@ -11087,9 +11098,16 @@ $CLASS('UI.XFrame', function(me, SELF){
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
+		'addNotificationListener',
+		'removeNofiticationListener',
 		'throwNotification',
 
 		'childToParent',
+
+		'onNotification',
+		'genRemoteRef',
+		'recycleRemoteRef',
+		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
@@ -11111,10 +11129,13 @@ $CLASS('UI.XFrame', function(me, SELF){
 
 	var m_visibility = SELF.VISIBILITY.VISIBILITY_NONE;
 
-	m_background = null;
-	m_mouseover_layer = null;
-	m_mousedown_layer = null;
-	m_selected_layer = null;
+	var m_background = null;
+	var m_mouseover_layer = null;
+	var m_mousedown_layer = null;
+	var m_selected_layer = null;
+
+	var m_notification_listener = [];
+	var m_remote_ref = [];
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
 		m_name = name;
@@ -11370,10 +11391,61 @@ $CLASS('UI.XFrame', function(me, SELF){
 		});
 	});
 
-	$PUBLIC_FUN_IMPL('throwNotification', function() {
+	$PUBLIC_FUN_IMPL('addNotificationListener', function(listener){
+		m_notification_listener.push(listener.genRemoteRef());
+	});
 
+	$PUBLIC_FUN_IMPL('removeNofiticationListener', function(listener){
+		for (var i = 0; i < m_notification_listener.length; i++) {
+			if (m_notification_listener[i].obj == listener) {
+				listener.recycleRemoteRef(m_notification_listener[i]);
+				m_notification_listener.splice(i,1);
+				break;
+			}
+		}
+	});
 
+	$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
+		for (var i = 0; i < m_notification_listener.length; /*no i++*/) {
+			var r = m_notification_listener[i];
+			if (r.obj) {r.obj.onNotification(notification); i++;}
+			else m_notification_listener.splice(i,1);
+		}
+	});
 
+	$PUBLIC_FUN_IMPL('onNotification', function(notification){
+		me.$THIS.$DISPATCH_MESSAGE('NOTIFICATION', notification);
+	});
+
+	$PUBLIC_FUN_IMPL('genRemoteRef', function(){
+		var ref = {'obj' : me.$THIS};
+		m_remote_ref.push(ref);
+	});
+
+	$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
+		var index = m_remote_ref.indexOf(ref);
+		m_remote_ref.splice(index, 1);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		$.each(m_remote_ref, function(i,v){
+			v.obj = null;
+		});
+		m_remote_ref = [];
+	});
+
+	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rc){
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
+			var pt = pt_or_rc;
+			return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
+		}
+
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
+			var rc = pt_or_rc;
+			var new_rect = new UI.Rect(rc);
+			new_rect.offset(m_rect.leftTop());
+			return new_rect;
+		}
 	});
 
 	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
@@ -11455,71 +11527,6 @@ $ENUM('UI.XFrame.NOTIFICATION',
 	'NOTIFICATION_FRAME_ATTACHED_TO_PARENT',
 	'NOTIFICATION_FRAME_DETACHED_FROM_PARENT',
 ])
-;
-
-(function(){
-
-
-	$CLASS('UI.XEventService', function(me, SELF){
-
-		$PUBLIC_FUN([
-			'postFrameEvent',
-			'hasPendingEvent',
-			'setTimer',
-			'killTimer'
-		]);
-
-		var event_to_post = [];
-
-		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
-			event_to_post.push({'frame' : frame, 'event' : event});
-			schedulePostEvent();
-		});
-
-		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
-			for (var i = 0; i < event_to_post.length; i++) {
-				if (event_to_post[i].event.id == id)
-					return true;
-			}
-			return false;
-		});
-
-		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
-			return setInterval(function(){
-				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
-			}, elapse);
-		});
-
-		$PUBLIC_FUN_IMPL('killTimer', function(id) {
-			clearInterval(id);
-		});
-
-		function schedulePostEvent() {
-			setTimeout(function(){
-				$.each(event_to_post, function(i,v){
-					var frame = v.frame;
-					var event = v.event;
-					frame.$DISPATCH_MESSAGE('EVENT', event);
-				});
-				event_to_post = [];
-			}, 0);
-		}
-
-	})
-	.$STATIC({
-		'instance' : eventServiceInstance			
-	});
-
-	var event_service_instance;
-	function eventServiceInstance() {
-		if (!event_service_instance)
-			event_service_instance = new UI.XEventService();
-		return event_service_instance;
-	}
-
-})();
-
-
 ;
 
 (function(){
@@ -11617,6 +11624,71 @@ $ENUM('UI.XFrame.NOTIFICATION',
 
 ;
 
+(function(){
+
+
+	$CLASS('UI.XEventService', function(me, SELF){
+
+		$PUBLIC_FUN([
+			'postFrameEvent',
+			'hasPendingEvent',
+			'setTimer',
+			'killTimer'
+		]);
+
+		var event_to_post = [];
+
+		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
+			event_to_post.push({'frame' : frame, 'event' : event});
+			schedulePostEvent();
+		});
+
+		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
+			for (var i = 0; i < event_to_post.length; i++) {
+				if (event_to_post[i].event.id == id)
+					return true;
+			}
+			return false;
+		});
+
+		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
+			return setInterval(function(){
+				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
+			}, elapse);
+		});
+
+		$PUBLIC_FUN_IMPL('killTimer', function(id) {
+			clearInterval(id);
+		});
+
+		function schedulePostEvent() {
+			setTimeout(function(){
+				$.each(event_to_post, function(i,v){
+					var frame = v.frame;
+					var event = v.event;
+					frame.$DISPATCH_MESSAGE('EVENT', event);
+				});
+				event_to_post = [];
+			}, 0);
+		}
+
+	})
+	.$STATIC({
+		'instance' : eventServiceInstance			
+	});
+
+	var event_service_instance;
+	function eventServiceInstance() {
+		if (!event_service_instance)
+			event_service_instance = new UI.XEventService();
+		return event_service_instance;
+	}
+
+})();
+
+
+;
+
 $CLASS('UI.IXDraw', function(me){
 
 	$PUBLIC_FUN({
@@ -11669,7 +11741,9 @@ $ENUM('UI.IXImage.DrawType',
 
 ;
 
-$CLASS('UI.XTextCanvasText', function(me, SELF){
+$CLASS('UI.XTextCanvasText', 
+$EXTENDS('UI.IXText'),
+function(me, SELF){
 
 	$PUBLIC_FUN([
 		'draw',
@@ -12225,9 +12299,7 @@ function(me, SELF){
 ;
 
 
-$CLASS('UI.XCanvasText', 
-EXTENDS('UI.IXText'),
-function(me, SELF){
+$CLASS('UI.XCanvasText', function(me, SELF){
 
 	$PUBLIC_FUN([
 		'draw',
