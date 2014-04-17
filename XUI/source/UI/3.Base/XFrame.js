@@ -27,6 +27,16 @@ function(me, SELF){
 		'isLayouting',
 		'invalidateLayout',
 
+		'measureWidth',
+		'measureHeight',
+		'getMeasuredWidth',
+		'getMeasuredHeight',
+		'layout',
+
+		'onMeasureWidth',
+		'onMeasureHeight',
+		'onLayout',
+
 		'addFrame',
 		'insertFrame',
 		'removeFrame',
@@ -56,6 +66,8 @@ function(me, SELF){
 	var m_delay_layout_param 	= null;
 	var m_delay_update_layout_param_scheduled = false;
 	var m_need_invalidate_after_layout = false;
+	var m_last_measure_width_param = null;
+	var m_
 	var m_rect = new UI.Rect();
 	
 	var m_name = null;
@@ -72,6 +84,7 @@ function(me, SELF){
 
 	var m_notification_listener = [];
 	var m_remote_ref = [];
+
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
 		m_name = name;
@@ -384,6 +397,15 @@ function(me, SELF){
 		}
 	});
 
+	$PUBLIC_FUN_IMPL('measureWidth', function(param){
+		if (param.equals(m_last_measure_width_param) && !m_layout_invalid)
+			return;
+
+		me.onMeasureWidth();
+	})
+
+	$PUBLIC_FUN_IMPL('measureHeight', function(param))
+
 	$MESSAGE_HANDLER('onDelayupdateLayout', function(){
 		if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
 			return;
@@ -443,6 +465,34 @@ $CLASS('UI.XFrame.LayoutParam', function(me, SELF){
 
 
 });
+
+$CLASS('UI.XFrame.MeasureParam', function(me, SELF){
+
+	$PUBLIC_VAR({
+		'spec' 	: SELF.MeasureParam.MEASURE_UNRESTRICTED,
+		'num'	: 0;
+	});
+
+	$PUBLIC_FUN('reset', function(){
+		me.spec =  SELF.MeasureParam.MEASURE_UNRESTRICTED;
+		me.num = 0;
+	});
+
+	$PUBLIC_FUN('equals', function(other){
+		return me.spec == other.spec &&
+			me.num == other.num;
+	});
+
+	$PUBLIC_FUN('notequals', function(other){
+		return !me.equals(other);
+	});
+});
+
+$ENUM('UI.XFrame.MeasureParam.MeasureSpec',[
+	MEASURE_UNRESTRICTED, 
+	MEASURE_ATMOST,
+	MEASURE_EXACT
+]);
 
 $ENUM('UI.XFrame.VISIBILITY', [
 	'VISIBILITY_SHOW',

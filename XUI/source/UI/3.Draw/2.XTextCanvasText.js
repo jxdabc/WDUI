@@ -1,7 +1,7 @@
 ;
 
 $CLASS('UI.XTextCanvasText', 
-$EXTENDS('UI.IXText'),
+$EXTENDS(UI.IXText),
 function(me, SELF){
 
 	$PUBLIC_FUN([

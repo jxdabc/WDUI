@@ -373,6 +373,7 @@
 		});
 	}
 
+	
 
 	function addObject(name, object) {
 		name = name.split('.');

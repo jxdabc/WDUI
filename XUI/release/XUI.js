@@ -10735,6 +10735,7 @@ String.prototype.format = function()
 		});
 	}
 
+	
 
 	function addObject(name, object) {
 		name = name.split('.');
@@ -11742,7 +11743,7 @@ $ENUM('UI.IXImage.DrawType',
 ;
 
 $CLASS('UI.XTextCanvasText', 
-$EXTENDS('UI.IXText'),
+$EXTENDS(UI.IXText),
 function(me, SELF){
 
 	$PUBLIC_FUN([
