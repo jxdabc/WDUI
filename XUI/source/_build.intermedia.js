@@ -11486,8 +11486,11 @@ function(me, SELF){
 
 	$PUBLIC_FUN_IMPL('invalidateRect', function(rc){
 
-		if (typeof rc == 'undefined')
-			rc = new UI.Rect(0, 0, m_rect.width(), m_rect.height());
+		// overload invalidateRect(). 
+		if (typeof rc == 'undefined') {
+			me.invalidateRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
+			return;
+		}
 
 		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return;
 		if (rc.isEmpty()) return;
@@ -11714,8 +11717,10 @@ function(me, SELF){
 			me.setRect(rc);
 		}
 
-		if (m_need_invalidate_after_layout)
+		if (m_need_invalidate_after_layout) {
+			m_need_invalidate_after_layout = false;
 			me.invalidateRect();
+		}
 	});
 
 	$PUBLIC_FUN_IMPL('getLayoutParam', function(){
@@ -11855,7 +11860,7 @@ $ENUM('UI.XFrame.NOTIFICATION',
 
 $ENUM('UI.XFrame.EVENT_ID',
 [
-	'EVENT_X_DELAY_UDPATE_LAYOUT'
+	'EVENT_X_DELAY_UDPATE_LAYOUT',
 ]);
 
 
@@ -11964,12 +11969,15 @@ function (me, SELF) {
 
 		'setRect',
 
-		'setVisibility'
+		'setVisibility',
+
+		'invalidateRect',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
 	[
 		$MAP(SELF.EVENT_ID.EVENT_X_LAYOUT, 'onXLayout'),
+		$MAP(SELF.EVENT_ID.EVENT_X_UPDATE, 'onXUpdate'),
 	]);
 
 	var $window = $(window);
@@ -11979,6 +11987,10 @@ function (me, SELF) {
 
 	var m_layout_scheduled = false;
 	var m_is_layouting = false;
+
+	var m_update_scheduled = false;
+	var m_invalidated_rects = [];
+
 
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
@@ -12059,6 +12071,34 @@ function (me, SELF) {
 		me.$PARENT(UI.XFrame).setVisibility(visibility);
 	});
 
+	$PUBLIC_FUN_IMPL('invalidateRect', function(rect) {
+
+		if (typeof rect == 'undefined') {
+			me.$PARENT(UI.XFrame).invalidateRect();
+			return;
+		}
+
+		var rect_frame = me.getRect();
+
+		var rect_real = rect.intersect(
+			new UI.Rect(0, 0, rect_frame.width(), rect_frame.height()));
+		if (rect_real.isEmpty())
+			return;
+
+		m_invalidated_rects.push(rect_real);
+
+		if (m_update_scheduled)
+			return;
+
+		m_update_scheduled = true;
+
+		UI.XEventService.instance().postFrameEvent(me.$THIS, 
+		{
+			'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+		});
+
+	});
+
 	$MESSAGE_HANDLER('onXLayout', function(){
 		if (!m_layout_scheduled) return;
 
@@ -12115,6 +12155,61 @@ function (me, SELF) {
 
 		m_is_layouting = false;
 	});
+	
+	$MESSAGE_HANDLER('onXUpdate', function(){
+		if (!m_update_scheduled) return;
+
+		var event_service = UI.XEventService.instance();
+
+
+		if (m_layout_scheduled || 
+			event_service.hasPendingEvent(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT))
+			event_service.postFrameEvent(me.$THIS, 
+			{
+				'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+			});
+
+
+		m_update_scheduled = false;
+
+		var area_sum = 0;
+		var area_bound = 0;
+
+		if (!m_invalidated_rects.length)
+			return;
+
+		var rect_bound = new UI.Rect(m_invalidated_rects[0]);
+
+		for (var i = 0; i < m_invalidated_rects.length; i++) {
+
+			var c = m_invalidated_rects[i];
+
+			if (i != 0) {
+				rect_bound.left = Math.min(rect_bound.left, c.left);
+				rect_bound.top = Math.min(rect_bound.top, c.top);
+				rect_bound.right = Math.max(rect_bound.right, c.right);
+				rect_bound.bottom = Math.max(rect_bound.bottom, c.bottom);
+			}
+
+			area_sum += c.area();
+
+			console.log('============');
+			console.log(c.toString());
+		}
+
+		if (!area_sum) {
+			m_invalidated_rects = [];
+			return;
+		}
+
+
+
+
+
+
+		m_invalidated_rects = [];
+
+	});
 
 	function schedule_layout() {
 		
@@ -12141,6 +12236,7 @@ function (me, SELF) {
 $ENUM('UI.XWindow.EVENT_ID',
 [
 	'EVENT_X_LAYOUT',
+	'EVENT_X_UPDATE',
 ]);
 ;
 
@@ -12251,16 +12347,16 @@ $ENUM('UI.XWindow.EVENT_ID',
 			'killTimer'
 		]);
 
-		var event_to_post = [];
+		var m_event_to_post = [];
 
 		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
-			event_to_post.push({'frame' : frame, 'event' : event});
+			m_event_to_post.push({'frame' : frame, 'event' : event});
 			schedulePostEvent();
 		});
 
 		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
-			for (var i = 0; i < event_to_post.length; i++) {
-				if (event_to_post[i].event.id == id)
+			for (var i = 0; i < m_event_to_post.length; i++) {
+				if (m_event_to_post[i].event.id == id)
 					return true;
 			}
 			return false;
@@ -12278,12 +12374,13 @@ $ENUM('UI.XWindow.EVENT_ID',
 
 		function schedulePostEvent() {
 			setTimeout(function(){
+				var event_to_post = m_event_to_post;
+				m_event_to_post = [];
 				$.each(event_to_post, function(i,v){
 					var frame = v.frame;
 					var event = v.event;
 					frame.$DISPATCH_MESSAGE('EVENT', event);
 				});
-				event_to_post = [];
 			}, 0);
 		}
 

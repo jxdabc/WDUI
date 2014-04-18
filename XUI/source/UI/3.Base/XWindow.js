@@ -11,12 +11,15 @@ function (me, SELF) {
 
 		'setRect',
 
-		'setVisibility'
+		'setVisibility',
+
+		'invalidateRect',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
 	[
 		$MAP(SELF.EVENT_ID.EVENT_X_LAYOUT, 'onXLayout'),
+		$MAP(SELF.EVENT_ID.EVENT_X_UPDATE, 'onXUpdate'),
 	]);
 
 	var $window = $(window);
@@ -26,6 +29,10 @@ function (me, SELF) {
 
 	var m_layout_scheduled = false;
 	var m_is_layouting = false;
+
+	var m_update_scheduled = false;
+	var m_invalidated_rects = [];
+
 
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
@@ -106,6 +113,34 @@ function (me, SELF) {
 		me.$PARENT(UI.XFrame).setVisibility(visibility);
 	});
 
+	$PUBLIC_FUN_IMPL('invalidateRect', function(rect) {
+
+		if (typeof rect == 'undefined') {
+			me.$PARENT(UI.XFrame).invalidateRect();
+			return;
+		}
+
+		var rect_frame = me.getRect();
+
+		var rect_real = rect.intersect(
+			new UI.Rect(0, 0, rect_frame.width(), rect_frame.height()));
+		if (rect_real.isEmpty())
+			return;
+
+		m_invalidated_rects.push(rect_real);
+
+		if (m_update_scheduled)
+			return;
+
+		m_update_scheduled = true;
+
+		UI.XEventService.instance().postFrameEvent(me.$THIS, 
+		{
+			'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+		});
+
+	});
+
 	$MESSAGE_HANDLER('onXLayout', function(){
 		if (!m_layout_scheduled) return;
 
@@ -162,6 +197,61 @@ function (me, SELF) {
 
 		m_is_layouting = false;
 	});
+	
+	$MESSAGE_HANDLER('onXUpdate', function(){
+		if (!m_update_scheduled) return;
+
+		var event_service = UI.XEventService.instance();
+
+
+		if (m_layout_scheduled || 
+			event_service.hasPendingEvent(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT))
+			event_service.postFrameEvent(me.$THIS, 
+			{
+				'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+			});
+
+
+		m_update_scheduled = false;
+
+		var area_sum = 0;
+		var area_bound = 0;
+
+		if (!m_invalidated_rects.length)
+			return;
+
+		var rect_bound = new UI.Rect(m_invalidated_rects[0]);
+
+		for (var i = 0; i < m_invalidated_rects.length; i++) {
+
+			var c = m_invalidated_rects[i];
+
+			if (i != 0) {
+				rect_bound.left = Math.min(rect_bound.left, c.left);
+				rect_bound.top = Math.min(rect_bound.top, c.top);
+				rect_bound.right = Math.max(rect_bound.right, c.right);
+				rect_bound.bottom = Math.max(rect_bound.bottom, c.bottom);
+			}
+
+			area_sum += c.area();
+
+			console.log('============');
+			console.log(c.toString());
+		}
+
+		if (!area_sum) {
+			m_invalidated_rects = [];
+			return;
+		}
+
+
+
+
+
+
+		m_invalidated_rects = [];
+
+	});
 
 	function schedule_layout() {
 		
@@ -188,4 +278,5 @@ function (me, SELF) {
 $ENUM('UI.XWindow.EVENT_ID',
 [
 	'EVENT_X_LAYOUT',
+	'EVENT_X_UPDATE',
 ]);

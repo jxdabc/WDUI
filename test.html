@@ -49,10 +49,24 @@
 		layout.margin_right = 3;
 		innerinner.create(inner, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
 
+		var i = 0;
 		setInterval(function(){
 			console.log('win' + win.getRect().toString());
 			console.log('inner:' + inner.getRect().toString());
 			console.log('innerinner:' + innerinner.getRect().toString());
+
+
+			if (i < 3) {
+				var param = inner.beginUpdateLayoutParam();
+				param.x += 10;
+				param.y += 10;
+				inner.endUpdateLayoutParam();
+				i++;
+			}
+
+
+
+
 		}, 3000);
 	})();
 

@@ -419,8 +419,10 @@ function(me, SELF){
 	$PUBLIC_FUN_IMPL('invalidateRect', function(rc){
 
 		// overload invalidateRect(). 
-		if (typeof rc == 'undefined')
+		if (typeof rc == 'undefined') {
 			me.invalidateRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
+			return;
+		}
 
 		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return;
 		if (rc.isEmpty()) return;
@@ -647,8 +649,10 @@ function(me, SELF){
 			me.setRect(rc);
 		}
 
-		if (m_need_invalidate_after_layout)
+		if (m_need_invalidate_after_layout) {
+			m_need_invalidate_after_layout = false;
 			me.invalidateRect();
+		}
 	});
 
 	$PUBLIC_FUN_IMPL('getLayoutParam', function(){
@@ -788,7 +792,7 @@ $ENUM('UI.XFrame.NOTIFICATION',
 
 $ENUM('UI.XFrame.EVENT_ID',
 [
-	'EVENT_X_DELAY_UDPATE_LAYOUT'
+	'EVENT_X_DELAY_UDPATE_LAYOUT',
 ]);
 
 
