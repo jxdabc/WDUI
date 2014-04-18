@@ -18,3 +18,8 @@ String.prototype.format = function()
             return args[count++];
         });
 }
+
+String.prototype.upperFirst = function()
+{
+	return this.substring(0, 1).toUpperCase() + this.substring(1);
+}

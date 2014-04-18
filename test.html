@@ -4,12 +4,57 @@
 
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
+<div id="test_div" style="width:80%;height:600px; border:1px solid red;margin-bottom:20px;">
+</div>
+
 <canvas width="800" height="5000" id="test_canvas">
 </canvas>
 
 <script type="text/javascript">
 
 	$CLASS('TEST', function(me){});
+
+	// test layout
+	(function(){
+
+		var img = new UI.XImageCanvasImage();
+		img.load('@bgalpha.9.png');
+
+		var win = new UI.XWindow();
+		var layout_param = new UI.XFrame.LayoutParam();
+		layout_param.x = 100;
+		layout_param.y = 100;
+		layout_param.width = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+		layout_param.height = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+		layout_param.margin_right = 50;
+		layout_param.margin_bottom = 50;
+		win.create($('#test_div')[0], layout_param, UI.XWindow.Visibility.VISIBILITY_SHOW);
+		win.setName('win');
+		win.setBackground(img);
+
+		var inner = new UI.XFrame();
+		var layout = win.generateLayoutParam();
+		layout.x = 150;
+		layout.y = 150;
+		layout.width = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+		layout.height = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT;
+		inner.create(win, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
+		inner.setName('inner');
+
+		var innerinner = new UI.XFrame();
+		var layout = inner.generateLayoutParam();
+		layout.x = layout.y = 10
+		layout.width = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+		layout.height = 100;
+		layout.margin_right = 3;
+		innerinner.create(inner, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
+
+		setInterval(function(){
+			console.log('win' + win.getRect().toString());
+			console.log('inner:' + inner.getRect().toString());
+			console.log('innerinner:' + innerinner.getRect().toString());
+		}, 3000);
+	})();
 
 	// message test
 	(function(){
@@ -42,7 +87,7 @@
 
 			$MESSAGE_HANDLER('mytimer', function(msg){
 				console.log(i++, SELF.classname, msg);
-				if (i == 10) UI.XEventService.instance().killTimer(timer_id);
+				if (i == 3) UI.XEventService.instance().killTimer(timer_id);
 				return true;
 			});
 
