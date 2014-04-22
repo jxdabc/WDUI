@@ -24,8 +24,8 @@ $CLASS('UI.XCanvasImage', function(me){
 
 		// overload function(img_src)
 
-		var width = sw || img_src.width;
-		var height = sh || img_src.height;
+		var width = sw || img_src.naturalWidth;
+		var height = sh || img_src.naturalHeight;
 
 		m_canvas = document.createElement('canvas');
 		m_canvas.width = width;

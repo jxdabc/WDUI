@@ -11130,11 +11130,16 @@ function(me, SELF){
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
+		'paintUI',
+		'paintBackground',
+		'paintForground',
+
 		'addNotificationListener',
 		'removeNofiticationListener',
 		'throwNotification',
 
 		'childToParent',
+		'parentToChild',
 
 		'onNotification',
 		'genRemoteRef',
@@ -11459,10 +11464,12 @@ function(me, SELF){
 				} else me.invalidateRect();
 				break;
 			case SELF.Visibility.VISIBILITY_HIDE:
-				if (old_visibility == SELF.Visibility.VISIBILITY_NONE) 
+				if (old_visibility == SELF.Visibility.VISIBILITY_NONE) {
 					if (m_parent) m_parent.invalidateLayout();
-				else
+				}
+				else {
 					if (m_parent) m_parent.invalidateRect(m_rect);
+				}
 				break;
 			case SELF.Visibility.VISIBILITY_NONE:
 				if (old_visibility == SELF.Visibility.VISIBILITY_SHOW)
@@ -11580,6 +11587,59 @@ function(me, SELF){
 			});
 	});
 
+	$PUBLIC_FUN_IMPL('paintUI', function(ctx, rect){
+		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
+			return;
+		me.paintBackground(ctx, rect);
+		me.paintForground(ctx, rect);
+	});
+
+	$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
+		if (m_background)
+			m_background.draw(ctx, rect);
+	});
+
+	$PUBLIC_FUN_IMPL('paintForground', function(ctx, rect) {
+		if (m_selectable && m_selected_state) {
+			fillSelectedLayer();
+			m_selected_layer.draw(ctx, rect);
+		}
+
+		if (m_touchable && m_mouse_over) {
+			if (m_mouse_down) {
+				fillMouseDownLayer();
+				m_mousedown_layer.draw(ctx, rect);
+			} else {
+				fillMouseOverLayer();
+				m_mouseover_layer.draw(ctx, rect);
+			}
+		}
+
+		for (var i = 0; i < m_child_frames.length; i++) {
+			var c = m_child_frames[i];
+			if (c.getVisibility() != SELF.Visibility.VISIBILITY_SHOW)
+				continue;
+
+			var frame_rect = c.getRect();
+
+			var rect_paint = frame_rect.intersect(rect);
+			if (rect_paint.isEmpty()) continue;
+
+			ctx.save();
+			ctx.beginPath();
+
+			ctx.rect(rect_paint.left, rect_paint.top,
+				rect_paint.width(), rect_paint.height());
+			ctx.clip();
+
+			ctx.translate(frame_rect.left, frame_rect.top);
+
+			c.paintUI(ctx, c.parentToChild(rect_paint));
+
+			ctx.restore();
+		}
+	});
+
 	$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
 		var parent = m_parent;
 		m_parent = NULL;
@@ -11685,6 +11745,20 @@ function(me, SELF){
 			var rc = pt_or_rc;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(m_rect.leftTop());
+			return new_rect;
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rc){
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
+			var pt = pt_or_rc;
+			return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
+		}
+
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
+			var rc = pt_or_rc;
+			var new_rect = new UI.Rect(rc);
+			new_rect.offset(-m_rect.left, -m_rect.top);
 			return new_rect;
 		}
 	});
@@ -11848,6 +11922,21 @@ function(me, SELF){
 		return measured_size;
 	}
 
+	function fillMouseOverLayer() {
+		if (m_mouseover_layer) return;
+		setMouseOverLayer(UI.XResourceMgr.getImage('img/layer/mouse_over.9.png'));
+	}
+
+	function fillMouseDownLayer() {
+		if (m_mousedown_layer) return;
+		setMouseDownLayer(UI.XResourceMgr.getImage('img/layer/mouse_down.9.png'));
+	}
+
+	function fillSelectedLayer() {
+		if (m_selected_layer) return;
+		setSelectedLayer(UI.XResourceMgr.getImage('img/layer/selected.9.png'));
+	}
+
 });
 
 $ENUM('UI.XFrame.NOTIFICATION',
@@ -11972,6 +12061,8 @@ function (me, SELF) {
 		'setVisibility',
 
 		'invalidateRect',
+
+		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
@@ -11982,8 +12073,8 @@ function (me, SELF) {
 
 	var $window = $(window);
 
-	var $window_container = null;
-	var $window_canvas = null;
+	var m_$window_container = null;
+	var m_$window_canvas = null;
 
 	var m_layout_scheduled = false;
 	var m_is_layouting = false;
@@ -11991,20 +12082,19 @@ function (me, SELF) {
 	var m_update_scheduled = false;
 	var m_invalidated_rects = [];
 
-
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
 		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
 
-		$window_container = $(container);
-		$window_container.css('position', 'relative');
+		m_$window_container = $(container);
+		m_$window_container.css('position', 'relative');
 
-		$window_canvas = $('<canvas></canvas>');
-		$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
-		$window_canvas.css('position', 'absolute');
-		$window_canvas.css({'width' : '0', 'height' : '0'});
-		$window_canvas.css('display', 'none');
-		$window_canvas.appendTo($window_container);
+		m_$window_canvas = $('<canvas></canvas>');
+		m_$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
+		m_$window_canvas.css('position', 'absolute');
+		m_$window_canvas.prop('width', 0).prop('height', 0);
+		m_$window_canvas.css('display', 'none');
+		m_$window_canvas.appendTo(m_$window_container);
 
 		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 	});
@@ -12013,14 +12103,12 @@ function (me, SELF) {
 	$PUBLIC_FUN_IMPL('setRect', function(new_rect){
 		var old = me.getRect();
 
-		if (me.getRect().equals(new_rect))
+		if (old.equals(new_rect))
 			return;
 
-		$window_canvas.css({
+		m_$window_canvas.css({
 			'left' 		: new_rect.left,
 			'top'		: new_rect.top,
-			'width'  	: new_rect.width(),
-			'height' 	: new_rect.height()
 		});
 
 		me.$PARENT(UI.XFrame).setRect(new_rect);
@@ -12056,15 +12144,15 @@ function (me, SELF) {
 
 		switch (visibility) {
 			case SELF.Visibility.VISIBILITY_NONE:
-				$window_canvas.css('display', 'none');
+				m_$window_canvas.css('display', 'none');
 				break;
 			case SELF.Visibility.VISIBILITY_HIDE:
-				$window_canvas.css('display', 'block');
-				$window_canvas.css('visibility', 'hidden');
+				m_$window_canvas.css('display', 'block');
+				m_$window_canvas.css('visibility', 'hidden');
 				break;
 			case SELF.Visibility.VISIBILITY_SHOW:
-				$window_canvas.css('display', 'block');
-				$window_canvas.css('visibility', 'visible');
+				m_$window_canvas.css('display', 'block');
+				m_$window_canvas.css('visibility', 'visible');
 				break;
 		}
 		
@@ -12097,6 +12185,22 @@ function (me, SELF) {
 			'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
 		});
 
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+
+		me.$PARENT(UI.XFrame).destroy();
+		
+		m_layout_scheduled = false;
+		m_is_layouting = false;
+		m_update_scheduled = false;	
+		m_invalidated_rects = [];
+
+		m_$window_container = null;
+		m_$window_canvas.remove();
+		m_$window_canvas = null;
+
+		releaseBuffer();
 	});
 
 	$MESSAGE_HANDLER('onXLayout', function(){
@@ -12132,13 +12236,13 @@ function (me, SELF) {
 			switch(layout_param[v]) {
 			case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
 				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
-				param_for_measure.num = $window_container[v]();
+				param_for_measure.num = m_$window_container[v]();
 			default: 
 				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
 				param_for_measure.num = 
 					layout_param[v] ==
 						SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT ?
-							$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
+							m_$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
 							layout_param[v];
 				break;
 			}
@@ -12202,10 +12306,28 @@ function (me, SELF) {
 			return;
 		}
 
+		var frame_rect = me.getRect();
 
+		var ctx = prepareCanvas();
 
-
-
+		ctx.save();
+		ctx.beginPath();
+		for (var i = 0; i < m_invalidated_rects.length; i++) {
+			var c = m_invalidated_rects[i];
+			ctx.rect(c.left, c.top, c.width(), c.height());
+		}
+		ctx.clip();
+		if (area_sum < rect_bound.area())
+			for (var i = 0; i < m_invalidated_rects.length; i++) {
+				var c = m_invalidated_rects[i];
+				ctx.clearRect(c.left, c.top, c.width(), c.height());
+				me.paintUI(ctx, c);
+			}
+		else {
+			ctx.clearRect(rect_bound.left, rect_bound.top, rect_bound.width(), rect_bound.height());
+			me.paintUI(ctx, rect_bound);
+		}
+		ctx.restore();
 
 		m_invalidated_rects = [];
 
@@ -12228,6 +12350,20 @@ function (me, SELF) {
 		schedule_layout();
 	}
 
+	function prepareCanvas() {
+		var frame_rect = me.getRect();
+
+		var frame_width = frame_rect.width();
+		var frame_height = frame_rect.height();
+
+		if (m_$window_canvas.prop('width') != frame_width)
+			m_$window_canvas.prop('width', frame_width);
+		if (m_$window_canvas.prop('height') != frame_height)
+			m_$window_canvas.prop('height', frame_height);
+
+		return m_$window_canvas[0].getContext('2d');
+	}
+
 })
 .$STATIC({
 	'Z_CANVAS_LAYER' : 100,
@@ -12238,6 +12374,72 @@ $ENUM('UI.XWindow.EVENT_ID',
 	'EVENT_X_LAYOUT',
 	'EVENT_X_UPDATE',
 ]);
+;
+
+(function(){
+
+
+	$CLASS('UI.XEventService', function(me, SELF){
+
+		$PUBLIC_FUN([
+			'postFrameEvent',
+			'hasPendingEvent',
+			'setTimer',
+			'killTimer'
+		]);
+
+		var m_event_to_post = [];
+
+		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
+			m_event_to_post.push({'frame' : frame, 'event' : event});
+			schedulePostEvent();
+		});
+
+		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
+			for (var i = 0; i < m_event_to_post.length; i++) {
+				if (m_event_to_post[i].event.id == id)
+					return true;
+			}
+			return false;
+		});
+
+		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
+			return setInterval(function(){
+				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
+			}, elapse);
+		});
+
+		$PUBLIC_FUN_IMPL('killTimer', function(id) {
+			clearInterval(id);
+		});
+
+		function schedulePostEvent() {
+			setTimeout(function(){
+				var event_to_post = m_event_to_post;
+				m_event_to_post = [];
+				$.each(event_to_post, function(i,v){
+					var frame = v.frame;
+					var event = v.event;
+					frame.$DISPATCH_MESSAGE('EVENT', event);
+				});
+			}, 0);
+		}
+
+	})
+	.$STATIC({
+		'instance' : eventServiceInstance			
+	});
+
+	var event_service_instance;
+	function eventServiceInstance() {
+		if (!event_service_instance)
+			event_service_instance = new UI.XEventService();
+		return event_service_instance;
+	}
+
+})();
+
+
 ;
 
 (function(){
@@ -12331,72 +12533,6 @@ $ENUM('UI.XWindow.EVENT_ID',
 })();
 
 
-
-
-;
-
-(function(){
-
-
-	$CLASS('UI.XEventService', function(me, SELF){
-
-		$PUBLIC_FUN([
-			'postFrameEvent',
-			'hasPendingEvent',
-			'setTimer',
-			'killTimer'
-		]);
-
-		var m_event_to_post = [];
-
-		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
-			m_event_to_post.push({'frame' : frame, 'event' : event});
-			schedulePostEvent();
-		});
-
-		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
-			for (var i = 0; i < m_event_to_post.length; i++) {
-				if (m_event_to_post[i].event.id == id)
-					return true;
-			}
-			return false;
-		});
-
-		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
-			return setInterval(function(){
-				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
-			}, elapse);
-		});
-
-		$PUBLIC_FUN_IMPL('killTimer', function(id) {
-			clearInterval(id);
-		});
-
-		function schedulePostEvent() {
-			setTimeout(function(){
-				var event_to_post = m_event_to_post;
-				m_event_to_post = [];
-				$.each(event_to_post, function(i,v){
-					var frame = v.frame;
-					var event = v.event;
-					frame.$DISPATCH_MESSAGE('EVENT', event);
-				});
-			}, 0);
-		}
-
-	})
-	.$STATIC({
-		'instance' : eventServiceInstance			
-	});
-
-	var event_service_instance;
-	function eventServiceInstance() {
-		if (!event_service_instance)
-			event_service_instance = new UI.XEventService();
-		return event_service_instance;
-	}
-
-})();
 
 
 ;
@@ -13004,6 +13140,9 @@ function(me, SELF){
 		return r << 24 | g << 16 | b << 8 | a;
 	}
 
+
+
+	
 	
 
 });
@@ -13196,8 +13335,8 @@ $CLASS('UI.XCanvasImage', function(me){
 
 		// overload function(img_src)
 
-		var width = sw || img_src.width;
-		var height = sh || img_src.height;
+		var width = sw || img_src.naturalWidth;
+		var height = sh || img_src.naturalHeight;
 
 		m_canvas = document.createElement('canvas');
 		m_canvas.width = width;

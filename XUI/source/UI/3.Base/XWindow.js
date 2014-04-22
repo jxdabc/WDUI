@@ -14,6 +14,8 @@ function (me, SELF) {
 		'setVisibility',
 
 		'invalidateRect',
+
+		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
@@ -24,8 +26,8 @@ function (me, SELF) {
 
 	var $window = $(window);
 
-	var $window_container = null;
-	var $window_canvas = null;
+	var m_$window_container = null;
+	var m_$window_canvas = null;
 
 	var m_layout_scheduled = false;
 	var m_is_layouting = false;
@@ -33,20 +35,19 @@ function (me, SELF) {
 	var m_update_scheduled = false;
 	var m_invalidated_rects = [];
 
-
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
 		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
 
-		$window_container = $(container);
-		$window_container.css('position', 'relative');
+		m_$window_container = $(container);
+		m_$window_container.css('position', 'relative');
 
-		$window_canvas = $('<canvas></canvas>');
-		$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
-		$window_canvas.css('position', 'absolute');
-		$window_canvas.css({'width' : '0', 'height' : '0'});
-		$window_canvas.css('display', 'none');
-		$window_canvas.appendTo($window_container);
+		m_$window_canvas = $('<canvas></canvas>');
+		m_$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
+		m_$window_canvas.css('position', 'absolute');
+		m_$window_canvas.prop('width', 0).prop('height', 0);
+		m_$window_canvas.css('display', 'none');
+		m_$window_canvas.appendTo(m_$window_container);
 
 		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 	});
@@ -55,14 +56,12 @@ function (me, SELF) {
 	$PUBLIC_FUN_IMPL('setRect', function(new_rect){
 		var old = me.getRect();
 
-		if (me.getRect().equals(new_rect))
+		if (old.equals(new_rect))
 			return;
 
-		$window_canvas.css({
+		m_$window_canvas.css({
 			'left' 		: new_rect.left,
 			'top'		: new_rect.top,
-			'width'  	: new_rect.width(),
-			'height' 	: new_rect.height()
 		});
 
 		me.$PARENT(UI.XFrame).setRect(new_rect);
@@ -98,15 +97,15 @@ function (me, SELF) {
 
 		switch (visibility) {
 			case SELF.Visibility.VISIBILITY_NONE:
-				$window_canvas.css('display', 'none');
+				m_$window_canvas.css('display', 'none');
 				break;
 			case SELF.Visibility.VISIBILITY_HIDE:
-				$window_canvas.css('display', 'block');
-				$window_canvas.css('visibility', 'hidden');
+				m_$window_canvas.css('display', 'block');
+				m_$window_canvas.css('visibility', 'hidden');
 				break;
 			case SELF.Visibility.VISIBILITY_SHOW:
-				$window_canvas.css('display', 'block');
-				$window_canvas.css('visibility', 'visible');
+				m_$window_canvas.css('display', 'block');
+				m_$window_canvas.css('visibility', 'visible');
 				break;
 		}
 		
@@ -139,6 +138,22 @@ function (me, SELF) {
 			'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
 		});
 
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+
+		me.$PARENT(UI.XFrame).destroy();
+		
+		m_layout_scheduled = false;
+		m_is_layouting = false;
+		m_update_scheduled = false;	
+		m_invalidated_rects = [];
+
+		m_$window_container = null;
+		m_$window_canvas.remove();
+		m_$window_canvas = null;
+
+		releaseBuffer();
 	});
 
 	$MESSAGE_HANDLER('onXLayout', function(){
@@ -174,13 +189,13 @@ function (me, SELF) {
 			switch(layout_param[v]) {
 			case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
 				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
-				param_for_measure.num = $window_container[v]();
+				param_for_measure.num = m_$window_container[v]();
 			default: 
 				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
 				param_for_measure.num = 
 					layout_param[v] ==
 						SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT ?
-							$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
+							m_$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
 							layout_param[v];
 				break;
 			}
@@ -244,10 +259,28 @@ function (me, SELF) {
 			return;
 		}
 
+		var frame_rect = me.getRect();
 
+		var ctx = prepareCanvas();
 
-
-
+		ctx.save();
+		ctx.beginPath();
+		for (var i = 0; i < m_invalidated_rects.length; i++) {
+			var c = m_invalidated_rects[i];
+			ctx.rect(c.left, c.top, c.width(), c.height());
+		}
+		ctx.clip();
+		if (area_sum < rect_bound.area())
+			for (var i = 0; i < m_invalidated_rects.length; i++) {
+				var c = m_invalidated_rects[i];
+				ctx.clearRect(c.left, c.top, c.width(), c.height());
+				me.paintUI(ctx, c);
+			}
+		else {
+			ctx.clearRect(rect_bound.left, rect_bound.top, rect_bound.width(), rect_bound.height());
+			me.paintUI(ctx, rect_bound);
+		}
+		ctx.restore();
 
 		m_invalidated_rects = [];
 
@@ -268,6 +301,20 @@ function (me, SELF) {
 
 	function onPageResize() {
 		schedule_layout();
+	}
+
+	function prepareCanvas() {
+		var frame_rect = me.getRect();
+
+		var frame_width = frame_rect.width();
+		var frame_height = frame_rect.height();
+
+		if (m_$window_canvas.prop('width') != frame_width)
+			m_$window_canvas.prop('width', frame_width);
+		if (m_$window_canvas.prop('height') != frame_height)
+			m_$window_canvas.prop('height', frame_height);
+
+		return m_$window_canvas[0].getContext('2d');
 	}
 
 })

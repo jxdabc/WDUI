@@ -62,11 +62,16 @@ function(me, SELF){
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
+		'paintUI',
+		'paintBackground',
+		'paintForground',
+
 		'addNotificationListener',
 		'removeNofiticationListener',
 		'throwNotification',
 
 		'childToParent',
+		'parentToChild',
 
 		'onNotification',
 		'genRemoteRef',
@@ -391,10 +396,12 @@ function(me, SELF){
 				} else me.invalidateRect();
 				break;
 			case SELF.Visibility.VISIBILITY_HIDE:
-				if (old_visibility == SELF.Visibility.VISIBILITY_NONE) 
+				if (old_visibility == SELF.Visibility.VISIBILITY_NONE) {
 					if (m_parent) m_parent.invalidateLayout();
-				else
+				}
+				else {
 					if (m_parent) m_parent.invalidateRect(m_rect);
+				}
 				break;
 			case SELF.Visibility.VISIBILITY_NONE:
 				if (old_visibility == SELF.Visibility.VISIBILITY_SHOW)
@@ -512,6 +519,59 @@ function(me, SELF){
 			});
 	});
 
+	$PUBLIC_FUN_IMPL('paintUI', function(ctx, rect){
+		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
+			return;
+		me.paintBackground(ctx, rect);
+		me.paintForground(ctx, rect);
+	});
+
+	$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
+		if (m_background)
+			m_background.draw(ctx, rect);
+	});
+
+	$PUBLIC_FUN_IMPL('paintForground', function(ctx, rect) {
+		if (m_selectable && m_selected_state) {
+			fillSelectedLayer();
+			m_selected_layer.draw(ctx, rect);
+		}
+
+		if (m_touchable && m_mouse_over) {
+			if (m_mouse_down) {
+				fillMouseDownLayer();
+				m_mousedown_layer.draw(ctx, rect);
+			} else {
+				fillMouseOverLayer();
+				m_mouseover_layer.draw(ctx, rect);
+			}
+		}
+
+		for (var i = 0; i < m_child_frames.length; i++) {
+			var c = m_child_frames[i];
+			if (c.getVisibility() != SELF.Visibility.VISIBILITY_SHOW)
+				continue;
+
+			var frame_rect = c.getRect();
+
+			var rect_paint = frame_rect.intersect(rect);
+			if (rect_paint.isEmpty()) continue;
+
+			ctx.save();
+			ctx.beginPath();
+
+			ctx.rect(rect_paint.left, rect_paint.top,
+				rect_paint.width(), rect_paint.height());
+			ctx.clip();
+
+			ctx.translate(frame_rect.left, frame_rect.top);
+
+			c.paintUI(ctx, c.parentToChild(rect_paint));
+
+			ctx.restore();
+		}
+	});
+
 	$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
 		var parent = m_parent;
 		m_parent = NULL;
@@ -617,6 +677,20 @@ function(me, SELF){
 			var rc = pt_or_rc;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(m_rect.leftTop());
+			return new_rect;
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rc){
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
+			var pt = pt_or_rc;
+			return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
+		}
+
+		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
+			var rc = pt_or_rc;
+			var new_rect = new UI.Rect(rc);
+			new_rect.offset(-m_rect.left, -m_rect.top);
 			return new_rect;
 		}
 	});
@@ -778,6 +852,21 @@ function(me, SELF){
 
 
 		return measured_size;
+	}
+
+	function fillMouseOverLayer() {
+		if (m_mouseover_layer) return;
+		setMouseOverLayer(UI.XResourceMgr.getImage('img/layer/mouse_over.9.png'));
+	}
+
+	function fillMouseDownLayer() {
+		if (m_mousedown_layer) return;
+		setMouseDownLayer(UI.XResourceMgr.getImage('img/layer/mouse_down.9.png'));
+	}
+
+	function fillSelectedLayer() {
+		if (m_selected_layer) return;
+		setSelectedLayer(UI.XResourceMgr.getImage('img/layer/selected.9.png'));
 	}
 
 });
