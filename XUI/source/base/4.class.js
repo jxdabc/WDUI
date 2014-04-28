@@ -20,7 +20,7 @@
 		if (name != 'XUIObject' && !extend_list.length)
 			extend_list.push(global.XUIObject);
 
-		addObject(name, factory);
+		addClass(name, factory);
 
 		var prototype = {'constructor' : null, 'classobj' : factory};
 		factory.prototype = empty_obj_factory.prototype = prototype;
@@ -34,7 +34,6 @@
 			$.each(parent, function(i,v) {
 				if (!parent.hasOwnProperty(i)) return;
 				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
-				// console.log(i);
 				makeReference(factory, i, parent, i);
 			});
 		});
@@ -338,7 +337,7 @@
 				Object.defineProperty(protected_this_reference, i, 
 				{
 					enumerable : true,
-					configurable : false,
+					configurable : true,
 					set: function (val) 
 					{
 						protected_this_reference.$THIS[i] = val;
@@ -375,7 +374,7 @@
 
 	
 
-	function addObject(name, object) {
+	function addClass(name, object) {
 		name = name.split('.');
 		var c = global;
 		var c_name = '';
@@ -388,7 +387,7 @@
 			c_name += '.';
 		}
 
-		c[name.last()] = object;
+		makeProperty(c, name.last(), object, false);
 	}
 
 	function makeReference(obj, name, target_obj, target_name) {

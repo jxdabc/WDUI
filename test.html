@@ -14,8 +14,27 @@
 
 	$CLASS('TEST', function(me){});
 
-	// test layout
+	// test frame
 	(function(){
+
+		$CLASS('TEST.MyFrame', 
+		$EXTENDS(UI.XFrame),
+		function(me,SELF){
+			$MESSAGE_MAP('EVENT', 
+			[
+				$MAP('mouseenter', 'test_event'),
+				$MAP('mouseleave', 'test_event'),
+				$MAP('dblclick', 'test_event'),
+				$MAP('mousedown', 'test_event'),
+				$MAP('mousemove', 'test_event'),
+				$MAP('mouseup', 'test_event'),
+			]);
+
+			$MESSAGE_HANDLER('test_event', function(e){
+				console.log(me.getName(), e);
+			});
+		});
+
 
 		var img = new UI.XImageCanvasImage();
 		img.load('@bgalpha.9.png');
@@ -32,7 +51,7 @@
 		win.setName('win');
 		win.setBackground(img);
 
-		var inner = new UI.XFrame();
+		var inner = new TEST.MyFrame();
 		var layout = win.generateLayoutParam();
 		layout.x = 150;
 		layout.y = 150;
@@ -40,14 +59,24 @@
 		layout.height = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT;
 		inner.create(win, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
 		inner.setName('inner');
+		var img = new UI.XImageCanvasImage();
+		img.load('skin/headbg.png');
+		img.setDrawType(UI.XImageCanvasImage.DrawType.DIT_STRETCH);
+		inner.setBackground(img);
 
-		var innerinner = new UI.XFrame();
+		var innerinner = new TEST.MyFrame();
 		var layout = inner.generateLayoutParam();
 		layout.x = layout.y = 10
 		layout.width = UI.XWindow.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
 		layout.height = 100;
-		layout.margin_right = 3;
+		layout.margin_right = 30;
 		innerinner.create(inner, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
+		innerinner.setName('innerinner');
+		var img = new UI.XImageCanvasImage();
+		img.load('skin/headbg.png');
+		img.setDrawType(UI.XImageCanvasImage.DrawType.DIT_STRETCH);
+		innerinner.setBackground(img);
+
 
 		var i = 0;
 		setInterval(function(){
@@ -118,7 +147,9 @@
 		var obj = new TEST.MesageTest();
 		var timer_id = UI.XEventService.instance().setTimer(obj, 1000);
 
-	})();
+	})
+	// ()
+	;
 
 
 	// Test Inheritance

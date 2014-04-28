@@ -28,19 +28,36 @@ $CLASS('UI.Rect', function(me){
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
 
+		// overload function()
+		// 			function(left_top, size)
+		//			function(left_top, right_bottom)
+		//			function(rect)
+
+
+
 		if (typeof left == "undefined")
 			return;
 
 		if (left.instanceOf && left.instanceOf(UI.Pt))
 		{
-			var pt = left;
-			var size = top;
+			var left_top = left;
+			me.left = left_top.x;
+			me.top = left_top.y;
 
-			me.left = pt.x;
-			me.top = pt.y;
-			me.right = me.left + size.w;
-			me.bottom = me.top + size.h;
-
+			if (top.instanceOf && top.instanceOf(UI.Size)) {
+				var size = top;
+				me.right = me.left + size.w;
+				me.bottom = me.top + size.h;
+				return;
+			}
+			
+			if (top.instanceOf && top.instanceOf(UI.Pt)) {
+				var right_bottom = top;
+				me.right = right_bottom.x;
+				me.bottom = right_bottom.y;
+				return;
+			}
+			
 			return;
 		}
 

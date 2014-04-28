@@ -35,6 +35,9 @@ function (me, SELF) {
 	var m_update_scheduled = false;
 	var m_invalidated_rects = [];
 
+	var m_msg_manager = null;
+
+
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
 		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
@@ -48,6 +51,8 @@ function (me, SELF) {
 		m_$window_canvas.prop('width', 0).prop('height', 0);
 		m_$window_canvas.css('display', 'none');
 		m_$window_canvas.appendTo(m_$window_container);
+
+		m_msg_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
 
 		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 	});
@@ -149,11 +154,12 @@ function (me, SELF) {
 		m_update_scheduled = false;	
 		m_invalidated_rects = [];
 
+		m_msg_manager = null;
+
 		m_$window_container = null;
 		m_$window_canvas.remove();
 		m_$window_canvas = null;
-
-		releaseBuffer();
+		
 	});
 
 	$MESSAGE_HANDLER('onXLayout', function(){

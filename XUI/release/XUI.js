@@ -10387,7 +10387,7 @@ String.prototype.upperFirst = function()
 		if (name != 'XUIObject' && !extend_list.length)
 			extend_list.push(global.XUIObject);
 
-		addObject(name, factory);
+		addClass(name, factory);
 
 		var prototype = {'constructor' : null, 'classobj' : factory};
 		factory.prototype = empty_obj_factory.prototype = prototype;
@@ -10401,7 +10401,6 @@ String.prototype.upperFirst = function()
 			$.each(parent, function(i,v) {
 				if (!parent.hasOwnProperty(i)) return;
 				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
-				// console.log(i);
 				makeReference(factory, i, parent, i);
 			});
 		});
@@ -10705,7 +10704,7 @@ String.prototype.upperFirst = function()
 				Object.defineProperty(protected_this_reference, i, 
 				{
 					enumerable : true,
-					configurable : false,
+					configurable : true,
 					set: function (val) 
 					{
 						protected_this_reference.$THIS[i] = val;
@@ -10742,7 +10741,7 @@ String.prototype.upperFirst = function()
 
 	
 
-	function addObject(name, object) {
+	function addClass(name, object) {
 		name = name.split('.');
 		var c = global;
 		var c_name = '';
@@ -10755,7 +10754,7 @@ String.prototype.upperFirst = function()
 			c_name += '.';
 		}
 
-		c[name.last()] = object;
+		makeProperty(c, name.last(), object, false);
 	}
 
 	function makeReference(obj, name, target_obj, target_name) {
@@ -10938,19 +10937,36 @@ $CLASS('UI.Rect', function(me){
 
 	$CONSTRUCTOR(function(left, top, right, bottom){
 
+		// overload function()
+		// 			function(left_top, size)
+		//			function(left_top, right_bottom)
+		//			function(rect)
+
+
+
 		if (typeof left == "undefined")
 			return;
 
 		if (left.instanceOf && left.instanceOf(UI.Pt))
 		{
-			var pt = left;
-			var size = top;
+			var left_top = left;
+			me.left = left_top.x;
+			me.top = left_top.y;
 
-			me.left = pt.x;
-			me.top = pt.y;
-			me.right = me.left + size.w;
-			me.bottom = me.top + size.h;
-
+			if (top.instanceOf && top.instanceOf(UI.Size)) {
+				var size = top;
+				me.right = me.left + size.w;
+				me.bottom = me.top + size.h;
+				return;
+			}
+			
+			if (top.instanceOf && top.instanceOf(UI.Pt)) {
+				var right_bottom = top;
+				me.right = right_bottom.x;
+				me.bottom = right_bottom.y;
+				return;
+			}
+			
 			return;
 		}
 
@@ -11044,16 +11060,41 @@ $CLASS('UI.Pt', function(me){
 		'y' : 0
 	});
 
+	$PUBLIC_FUN([
+		'inRect',
+		'toString',
+	]);
+
 
 	$CONSTRUCTOR(function(x, y){
-		if (typeof x != 'undefined' &&
-			typeof y != 'undefined')
-		{
-			me.x = x;
-			me.y = y;
+
+		// overload function()
+		// 			function(pt)
+
+		if (typeof x == 'undefined')
+			return;
+
+		if (x.instanceOf && x.instanceOf(UI.Pt)) {
+			var pt = x;
+			me.x = pt.x;
+			me.y = pt.y;
+			return;
 		}
+
+		me.x = x;
+		me.y = y;
 	});
 
+	$PUBLIC_FUN_IMPL('inRect', function(rc){
+		return me.x >= rc.left &&
+			me.x < rc.right &&
+			me.y >= rc.top &&
+			me.y < rc.bottom;
+	});
+
+	$PUBLIC_FUN_IMPL('toString', function(){
+		return 'x:%, y:%'.format(me.x, me.y);
+	});
 
 });
 $CLASS('UI.IXNotificationLister', function(me,SELF){
@@ -11127,6 +11168,7 @@ function(me, SELF){
 		'removeFrame',
 		'getFrameByIndex',
 		'setParent',
+		'getParent',
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
@@ -11138,18 +11180,29 @@ function(me, SELF){
 		'removeNofiticationListener',
 		'throwNotification',
 
+		'getTopFrameFromPoint',
+
+		'needPrepareMsg',
+
 		'childToParent',
 		'parentToChild',
+		'otherFrameToThisFrame',
+
+		'destroy',
+		'isFrameActive',
 
 		'onNotification',
 		'genRemoteRef',
 		'recycleRemoteRef',
-		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
 	[
-		$MAP(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout')
+		$MAP(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout'),
+		$MAP('mousedown', 'onMouseDown'),
+		$MAP('mouseup', 'onMouseUp'),
+		$MAP('mouseleave', 'onMouseLeave'),
+		$MAP('mouseenter', 'onMouseEnter'),
 	]);
 
 	var m_layout_invalid = true;
@@ -11186,6 +11239,8 @@ function(me, SELF){
 
 	var m_notification_listener = [];
 	var m_remote_ref = [];
+
+	var m_active = false;
 
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
@@ -11229,6 +11284,8 @@ function(me, SELF){
 		me.setParent(parent);
 
 		me.setVisibility(visibility);
+
+		m_active = true;
 	});
 
 	$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(layout_param){
@@ -11577,6 +11634,10 @@ function(me, SELF){
 		if (parent) parent.addFrame(me.$THIS);
 	});
 
+	$PUBLIC_FUN_IMPL('getParent', function(){
+		return m_parent;
+	});
+
 	$PUBLIC_FUN_IMPL('onAttachedToParent', function(parent){
 		if (m_parent) setParent(NULL);
 		m_parent = parent;
@@ -11664,10 +11725,13 @@ function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
-		for (var i = 0; i < m_notification_listener.length; /*no i++*/) {
-			var r = m_notification_listener[i];
+
+		var notification_listeners = m_notification_listener;
+
+		for (var i = 0; i < notification_listeners.length; /*no i++*/) {
+			var r = notification_listeners[i];
 			if (r.obj) {r.obj.onNotification(notification); i++;}
-			else m_notification_listener.splice(i,1);
+			else notification_listeners.splice(i,1);
 		}
 	});
 
@@ -11730,37 +11794,97 @@ function(me, SELF){
 			v.obj = null;
 		});
 		m_remote_ref = [];
+
+		m_active = false;
 	});
 
+	$PUBLIC_FUN_IMPL('isFrameActive', function(){
+		return m_active;
+	});
+
+	$PUBLIC_FUN_IMPL('getTopFrameFromPoint', function(pt) {
+		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return null;
+		if (!pt.inRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height())))
+			return null;
+
+		var frame = me.$THIS;
+
+		for (var i = m_child_frames.length - 1; i >=0; i--) {
+			var c = m_child_frames[i];
+			var frame_child = c.getTopFrameFromPoint(c.parentToChild(pt));
+			if (frame_child) {
+				frame = frame_child;
+				break;
+			}
+		}
+
+		return frame;
+	});
+
+	$PUBLIC_FUN_IMPL('needPrepareMsg', function(){
+		return true;
+	})
 
 
-
-	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rc){
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
-			var pt = pt_or_rc;
+	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
+			var pt = pt_or_rect;
 			return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
 		}
 
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
-			var rc = pt_or_rc;
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(m_rect.leftTop());
 			return new_rect;
 		}
 	});
 
-	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rc){
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
-			var pt = pt_or_rc;
+	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
+			var pt = pt_or_rect;
 			return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
 		}
 
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
-			var rc = pt_or_rc;
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(-m_rect.left, -m_rect.top);
 			return new_rect;
 		}
+	});
+
+	$PUBLIC_FUN_IMPL('otherFrameToThisFrame', function (other, pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
+			var left_top = me.otherFrameToThisFrame(rc.leftTop());
+			var right_bottpm = me.otherFrameToThisFrame(rc.rightBottom());
+			return new UI.Rect(left_top, right_bottpm);
+		}
+
+		var pt = pt_or_rect;
+
+		var this_frame_root = me;
+		var other_frame_root = other;
+
+		var this_org_pt = new UI.Pt(0,0);
+		var target_pt = new UI.Pt(pt);
+
+		while (this_frame_root.getParent()) {
+			this_org_pt = this_frame_root.childToParent(this_org_pt);
+			this_frame_root = this_frame_root.getParent();
+		}
+
+		while (other_frame_root.getParent()) {
+			target_pt = other_frame_root.childToParent(target_pt);
+			other_frame_root = other_frame_root.getParent();
+		}
+
+		if (this_frame_root != other_frame_root)
+			return new UI.Pt(0,0);
+
+		return new UI.Pt(target_pt.x - this_org_pt.x,
+			target_pt.y - this_org_pt.y);
 	});
 
 	$PUBLIC_FUN_IMPL('measureWidth', function(param){
@@ -11840,6 +11964,27 @@ function(me, SELF){
 		m_delay_layout_param = null;
 
 		me.endUpdateLayoutParam();
+	});
+
+	$MESSAGE_HANDLER('onMouseDown', function(){
+		if (!m_touchable && !m_select_when_mouse_click && !m_unselected_when_mouse_click)
+			return;
+
+		m_mouse_down = true;
+
+		
+	});
+
+	$MESSAGE_HANDLER('onMouseUp', function(){
+
+	});
+
+	$MESSAGE_HANDLER('onMouseLeave', function(){
+
+	});
+
+	$MESSAGE_HANDLER('onMouseEnter', function(){
+
 	});
 
 
@@ -12082,6 +12227,9 @@ function (me, SELF) {
 	var m_update_scheduled = false;
 	var m_invalidated_rects = [];
 
+	var m_msg_manager = null;
+
+
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
 		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
@@ -12095,6 +12243,8 @@ function (me, SELF) {
 		m_$window_canvas.prop('width', 0).prop('height', 0);
 		m_$window_canvas.css('display', 'none');
 		m_$window_canvas.appendTo(m_$window_container);
+
+		m_msg_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
 
 		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 	});
@@ -12196,11 +12346,12 @@ function (me, SELF) {
 		m_update_scheduled = false;	
 		m_invalidated_rects = [];
 
+		m_msg_manager = null;
+
 		m_$window_container = null;
 		m_$window_canvas.remove();
 		m_$window_canvas = null;
-
-		releaseBuffer();
+		
 	});
 
 	$MESSAGE_HANDLER('onXLayout', function(){
@@ -12378,72 +12529,6 @@ $ENUM('UI.XWindow.EVENT_ID',
 
 (function(){
 
-
-	$CLASS('UI.XEventService', function(me, SELF){
-
-		$PUBLIC_FUN([
-			'postFrameEvent',
-			'hasPendingEvent',
-			'setTimer',
-			'killTimer'
-		]);
-
-		var m_event_to_post = [];
-
-		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
-			m_event_to_post.push({'frame' : frame, 'event' : event});
-			schedulePostEvent();
-		});
-
-		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
-			for (var i = 0; i < m_event_to_post.length; i++) {
-				if (m_event_to_post[i].event.id == id)
-					return true;
-			}
-			return false;
-		});
-
-		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
-			return setInterval(function(){
-				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
-			}, elapse);
-		});
-
-		$PUBLIC_FUN_IMPL('killTimer', function(id) {
-			clearInterval(id);
-		});
-
-		function schedulePostEvent() {
-			setTimeout(function(){
-				var event_to_post = m_event_to_post;
-				m_event_to_post = [];
-				$.each(event_to_post, function(i,v){
-					var frame = v.frame;
-					var event = v.event;
-					frame.$DISPATCH_MESSAGE('EVENT', event);
-				});
-			}, 0);
-		}
-
-	})
-	.$STATIC({
-		'instance' : eventServiceInstance			
-	});
-
-	var event_service_instance;
-	function eventServiceInstance() {
-		if (!event_service_instance)
-			event_service_instance = new UI.XEventService();
-		return event_service_instance;
-	}
-
-})();
-
-
-;
-
-(function(){
-
 	$CLASS('UI.XResourceMgr', function(me){
 
 		$PUBLIC_FUN([
@@ -12535,6 +12620,326 @@ $ENUM('UI.XWindow.EVENT_ID',
 
 
 
+;
+
+(function(){
+
+
+	$CLASS('UI.XEventService', function(me, SELF){
+
+		$PUBLIC_FUN([
+			'postFrameEvent',
+			'hasPendingEvent',
+			'setTimer',
+			'killTimer'
+		]);
+
+		var m_event_to_post = [];
+
+		$PUBLIC_FUN_IMPL('postFrameEvent', function(frame, event){
+			m_event_to_post.push({'frame' : frame, 'event' : event});
+			schedulePostEvent();
+		});
+
+		$PUBLIC_FUN_IMPL('hasPendingEvent', function(id){
+			for (var i = 0; i < m_event_to_post.length; i++) {
+				if (m_event_to_post[i].event.id == id)
+					return true;
+			}
+			return false;
+		});
+
+		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
+			return setInterval(function(){
+				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
+			}, elapse);
+		});
+
+		$PUBLIC_FUN_IMPL('killTimer', function(id) {
+			clearInterval(id);
+		});
+
+		function schedulePostEvent() {
+			setTimeout(function(){
+				var event_to_post = m_event_to_post;
+				m_event_to_post = [];
+				$.each(event_to_post, function(i,v){
+					var frame = v.frame;
+					var event = v.event;
+					frame.$DISPATCH_MESSAGE('EVENT', event);
+				});
+			}, 0);
+		}
+
+	})
+	.$STATIC({
+		'instance' : eventServiceInstance			
+	});
+
+	var event_service_instance;
+	function eventServiceInstance() {
+		if (!event_service_instance)
+			event_service_instance = new UI.XEventService();
+		return event_service_instance;
+	}
+
+})();
+
+
+
+;
+
+$CLASS('UI.XFrameEventMgr', function(me, SELF){
+
+	var m_root_frame = null;
+	var m_$position_canvas = null;
+
+	var m_Event_handle_map = null;
+	var m_$default_handle_on = null;
+
+	var m_capture_mouse_frame = null;
+	var m_focus_frame = null;
+
+	var m_mouse_in_frame_stack = [];
+
+	var m_mouse_enter_message = { id : 'mouseenter'};
+	var m_mouse_leave_message = { id : 'mouseleave'};
+
+	$CONSTRUCTOR(function(root_frame, $position_canvas){
+		m_root_frame = root_frame;
+		m_$position_canvas = $position_canvas;
+		fillEventHandleMapAndDefautHandleElement();
+		init();
+	});
+
+	$PUBLIC_FUN([
+		'captureMouse',
+		'releaseCaptureMouse',
+		'getFocus',
+//		'killFocus',
+	]);
+
+	$PUBLIC_FUN_IMPL('captureMouse', function(frame){
+		if (!frame) return;
+		m_capture_mouse_frame = frame;
+	});
+
+	$PUBLIC_FUN_IMPL('releaseCaptureMouse', function(frame){
+		if (!frame) return;
+		if (m_capture_mouse_frame != frame)
+			return;
+
+		m_capture_mouse_frame = null;
+
+		// Because we have no way to obtain the mouse position
+		// without an event, we think the mouse is out of the screen
+		// whenever we release a mouse capture. 
+		updateMouseIn(null);
+	});
+
+	$PUBLIC_FUN_IMPL('getFocus', function(frame){
+		if (!frame) return;
+		if (m_focus_frame == frame) return;
+		if (m_focus_frame) me.killFocus(m_focus_frame);
+
+		m_focus_frame = frame;
+
+	});
+
+
+	function init() {
+
+		var type_hash = {};
+
+		$.each(m_Event_handle_map, function(i,v){
+			if (type_hash[v.event]) return;
+			type_hash[v.event] = true;
+
+			var $capture_on = m_$default_handle_on;
+			if (v.$capture_on) $capture_on = v.$capture_on;
+			$capture_on.on(v.event + '.XUI', onEvent);
+		});
+	}
+
+	function fillEventHandleMapAndDefautHandleElement() {
+		
+		m_Event_handle_map = 
+			[
+				{'event' : 'mousemove', 'proc' : handleHoverLeaveEvent, 'handle' : false},
+				{'event' : 'mousedown', 'proc' : handleHoverLeaveEvent, 'handle' : false},
+				{'event' : 'mouseleave', 'proc' : handleHoverLeaveEvent, 'handle' : false},
+
+				{'event' : 'mousedown', 'handle' : false},
+				{'event' : 'mouseup', 'handle' : false},
+				{'event' : 'dblclick', 'handle' : false},
+				{'event' : 'mousemove', 'handle' : false},
+				{'event' : 'mousewheel', 'handle' : false},
+				{'event' : 'keydown', 'handle' : false},
+				{'event' : 'focus', '$capture_on' : $(window), 'handle' : false},
+				{'event' : 'blur', '$capture_on' : $(window), 'handle' : false},
+			];
+
+		m_$default_handle_on = $(document);
+	}
+
+	function onEvent(e) {
+
+		var offset_frame = m_$position_canvas.offset();
+		if (typeof e.pageX != 'undefined' &&
+			typeof e.pageY != 'undefined')
+			e.UI_pt = new UI.Pt(
+				e.pageX - offset_frame.left,
+				e.pageY - offset_frame.top);
+
+		var type = e.type;
+		var handled = false;
+
+		for (var i = 0; i < m_Event_handle_map.length; i++) {
+			var c = m_Event_handle_map[i];
+			if (c.event != type) continue;
+
+			if (c.proc) {
+				var continue_find_handler = c.proc(e);
+				handled = e.handled;
+				handled = handled || c.handled;
+				if (!continue_find_handler || handled)
+					break;
+			} else {
+				handled = c.handle;
+				var target = getEventTarget(e);
+				if (!target) break;
+				handled = handled || dispatchEvent(target, e);
+				break;
+			}
+		};
+
+		if (handled) {
+			e.preventDefault();
+			e.cancelBubble();
+		}
+	}
+
+	function handleHoverLeaveEvent(e) {
+		switch (e.type)
+		{
+			case 'mouseleave':
+				updateMouseIn(null);
+				return false;
+			case 'mousedown':
+			case 'mousemove':
+				var frame_mouse_in = m_capture_mouse_frame || 
+					m_root_frame.getTopFrameFromPoint(e.UI_pt);
+				updateMouseIn(frame_mouse_in);
+				return true;
+		}
+
+		return true;
+	}
+
+	function getEventTarget(e) {
+		var target = null;
+
+		switch (e.type) {
+			case 'mousedown':
+			case 'mouseup':
+			case 'dblclick':
+			case 'mousemove':
+				if (m_capture_mouse_frame)
+					return m_capture_mouse_frame;
+				else
+					return m_root_frame.getTopFrameFromPoint(e.UI_pt);
+				break;
+
+			default:
+			break;
+		}
+
+		return m_focus_frame;
+	}
+
+	function dispatchEvent(target, e) {
+		while (target) {
+			var msg4frame = prepareMessageForFrame(target, e);
+			if (target.$DISPATCH_MESSAGE('EVENT', msg4frame))
+				return true;
+			if (msg4frame.bubbleCanceled) break;
+			target = target.getParent();
+		}
+
+		return false;
+	}
+
+	function prepareMessageForFrame(target, e) {
+		var msg4frame = 
+		{
+			'id' : e.type,
+			'extra' : e,
+			'bubbleCanceled' : false,
+			'cancelBubble' : function(){this.bubbleCanceled = true}
+		};
+		if (e.UI_pt) msg4frame.UI_pt = e.UI_pt;
+
+		if (!target.needPrepareMsg()) return msg4frame;
+		switch (msg4frame.id) {
+			case 'mousedown':
+			case 'mouseup':
+			case 'dblclick':
+			case 'mousemove':
+				msg4frame.UI_pt = 
+					target.otherFrameToThisFrame(m_root_frame, msg4frame.UI_pt);
+				break;
+
+			default:
+				break;
+		}
+
+		return msg4frame;
+	}
+
+	function updateMouseIn(frame) {
+
+
+		var mouse_in_message = {
+			id : 'mousein',
+			info : {},
+
+		}
+
+		if (!frame)
+			while (m_mouse_in_frame_stack.length) {
+				var f = m_mouse_in_frame_stack.pop();
+				f.$DISPATCH_MESSAGE('EVENT', m_mouse_leave_message);
+			}
+		else {
+			var current_path = [];
+			while (frame) {
+				current_path.unshift(frame);
+				frame = frame.getParent();
+			}
+
+			var  i = 0;
+			for (; i < current_path.length && i < m_mouse_in_frame_stack.length; i++) {
+				if (current_path[i] != m_mouse_in_frame_stack[i])
+					break;
+			}
+
+			while (i < m_mouse_in_frame_stack.length) {
+				var f = m_mouse_in_frame_stack.pop();
+				f.$DISPATCH_MESSAGE('EVENT', m_mouse_leave_message);
+			}
+
+			while (i < current_path.length) {
+				var f = current_path[i];
+				f.$DISPATCH_MESSAGE('EVENT', m_mouse_enter_message);
+				m_mouse_in_frame_stack.push(f);
+				i++;
+			}
+		}
+
+
+	}
+
+});
 ;
 
 $CLASS('UI.IXDraw', function(me){

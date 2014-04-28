@@ -59,6 +59,7 @@ function(me, SELF){
 		'removeFrame',
 		'getFrameByIndex',
 		'setParent',
+		'getParent',
 		'onDetachedFromParent',
 		'onAttachedToParent',
 
@@ -70,18 +71,29 @@ function(me, SELF){
 		'removeNofiticationListener',
 		'throwNotification',
 
+		'getTopFrameFromPoint',
+
+		'needPrepareMsg',
+
 		'childToParent',
 		'parentToChild',
+		'otherFrameToThisFrame',
+
+		'destroy',
+		'isFrameActive',
 
 		'onNotification',
 		'genRemoteRef',
 		'recycleRemoteRef',
-		'destroy',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
 	[
-		$MAP(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout')
+		$MAP(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT, 'onDelayupdateLayout'),
+		$MAP('mousedown', 'onMouseDown'),
+		$MAP('mouseup', 'onMouseUp'),
+		$MAP('mouseleave', 'onMouseLeave'),
+		$MAP('mouseenter', 'onMouseEnter'),
 	]);
 
 	var m_layout_invalid = true;
@@ -118,6 +130,8 @@ function(me, SELF){
 
 	var m_notification_listener = [];
 	var m_remote_ref = [];
+
+	var m_active = false;
 
 
 	$PUBLIC_FUN_IMPL('setName', function(name){
@@ -161,6 +175,8 @@ function(me, SELF){
 		me.setParent(parent);
 
 		me.setVisibility(visibility);
+
+		m_active = true;
 	});
 
 	$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(layout_param){
@@ -509,6 +525,10 @@ function(me, SELF){
 		if (parent) parent.addFrame(me.$THIS);
 	});
 
+	$PUBLIC_FUN_IMPL('getParent', function(){
+		return m_parent;
+	});
+
 	$PUBLIC_FUN_IMPL('onAttachedToParent', function(parent){
 		if (m_parent) setParent(NULL);
 		m_parent = parent;
@@ -596,10 +616,13 @@ function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
-		for (var i = 0; i < m_notification_listener.length; /*no i++*/) {
-			var r = m_notification_listener[i];
+
+		var notification_listeners = m_notification_listener;
+
+		for (var i = 0; i < notification_listeners.length; /*no i++*/) {
+			var r = notification_listeners[i];
 			if (r.obj) {r.obj.onNotification(notification); i++;}
-			else m_notification_listener.splice(i,1);
+			else notification_listeners.splice(i,1);
 		}
 	});
 
@@ -662,37 +685,97 @@ function(me, SELF){
 			v.obj = null;
 		});
 		m_remote_ref = [];
+
+		m_active = false;
 	});
 
+	$PUBLIC_FUN_IMPL('isFrameActive', function(){
+		return m_active;
+	});
+
+	$PUBLIC_FUN_IMPL('getTopFrameFromPoint', function(pt) {
+		if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return null;
+		if (!pt.inRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height())))
+			return null;
+
+		var frame = me.$THIS;
+
+		for (var i = m_child_frames.length - 1; i >=0; i--) {
+			var c = m_child_frames[i];
+			var frame_child = c.getTopFrameFromPoint(c.parentToChild(pt));
+			if (frame_child) {
+				frame = frame_child;
+				break;
+			}
+		}
+
+		return frame;
+	});
+
+	$PUBLIC_FUN_IMPL('needPrepareMsg', function(){
+		return true;
+	})
 
 
-
-	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rc){
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
-			var pt = pt_or_rc;
+	$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
+			var pt = pt_or_rect;
 			return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
 		}
 
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
-			var rc = pt_or_rc;
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(m_rect.leftTop());
 			return new_rect;
 		}
 	});
 
-	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rc){
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Pt)) {
-			var pt = pt_or_rc;
+	$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
+			var pt = pt_or_rect;
 			return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
 		}
 
-		if (pt_or_rc.instanceOf && pt_or_rc.instanceOf(UI.Rect)) {
-			var rc = pt_or_rc;
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
 			var new_rect = new UI.Rect(rc);
 			new_rect.offset(-m_rect.left, -m_rect.top);
 			return new_rect;
 		}
+	});
+
+	$PUBLIC_FUN_IMPL('otherFrameToThisFrame', function (other, pt_or_rect){
+		if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+			var rc = pt_or_rect;
+			var left_top = me.otherFrameToThisFrame(rc.leftTop());
+			var right_bottpm = me.otherFrameToThisFrame(rc.rightBottom());
+			return new UI.Rect(left_top, right_bottpm);
+		}
+
+		var pt = pt_or_rect;
+
+		var this_frame_root = me;
+		var other_frame_root = other;
+
+		var this_org_pt = new UI.Pt(0,0);
+		var target_pt = new UI.Pt(pt);
+
+		while (this_frame_root.getParent()) {
+			this_org_pt = this_frame_root.childToParent(this_org_pt);
+			this_frame_root = this_frame_root.getParent();
+		}
+
+		while (other_frame_root.getParent()) {
+			target_pt = other_frame_root.childToParent(target_pt);
+			other_frame_root = other_frame_root.getParent();
+		}
+
+		if (this_frame_root != other_frame_root)
+			return new UI.Pt(0,0);
+
+		return new UI.Pt(target_pt.x - this_org_pt.x,
+			target_pt.y - this_org_pt.y);
 	});
 
 	$PUBLIC_FUN_IMPL('measureWidth', function(param){
@@ -772,6 +855,27 @@ function(me, SELF){
 		m_delay_layout_param = null;
 
 		me.endUpdateLayoutParam();
+	});
+
+	$MESSAGE_HANDLER('onMouseDown', function(){
+		if (!m_touchable && !m_select_when_mouse_click && !m_unselected_when_mouse_click)
+			return;
+
+		m_mouse_down = true;
+
+		
+	});
+
+	$MESSAGE_HANDLER('onMouseUp', function(){
+
+	});
+
+	$MESSAGE_HANDLER('onMouseLeave', function(){
+
+	});
+
+	$MESSAGE_HANDLER('onMouseEnter', function(){
+
 	});
 
 
