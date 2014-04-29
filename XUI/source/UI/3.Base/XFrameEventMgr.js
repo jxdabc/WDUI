@@ -6,7 +6,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	var m_root_frame = null;
 	var m_$position_canvas = null;
 
-	var m_Event_handle_map = null;
+	var m_event_handle_map = null;
 	var m_$default_handle_on = null;
 
 	var m_capture_mouse_frame = null;
@@ -16,6 +16,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 	var m_mouse_enter_message = { id : 'mouseenter'};
 	var m_mouse_leave_message = { id : 'mouseleave'};
+	var m_focus_raw_event = {type : 'focus'};
+	var m_blur_raw_event = {type : 'blur'};
 
 	$CONSTRUCTOR(function(root_frame, $position_canvas){
 		m_root_frame = root_frame;
@@ -28,7 +30,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		'captureMouse',
 		'releaseCaptureMouse',
 		'getFocus',
-//		'killFocus',
+		'killFocus',
 	]);
 
 	$PUBLIC_FUN_IMPL('captureMouse', function(frame){
@@ -56,6 +58,16 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 		m_focus_frame = frame;
 
+		dispatchEvent(frame, m_focus_raw_event);
+	});
+
+	$PUBLIC_FUN_IMPL('killFocus', function(frame){
+		if (!frame) return;
+		if (m_focus_frame != frame) return;
+
+		m_focus_frame = null;
+
+		dispatchEvent(frame, m_blur_raw_event);
 	});
 
 
@@ -63,7 +75,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 		var type_hash = {};
 
-		$.each(m_Event_handle_map, function(i,v){
+		$.each(m_event_handle_map, function(i,v){
 			if (type_hash[v.event]) return;
 			type_hash[v.event] = true;
 
@@ -75,7 +87,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 	function fillEventHandleMapAndDefautHandleElement() {
 		
-		m_Event_handle_map = 
+		m_event_handle_map = 
 			[
 				{'event' : 'mousemove', 'proc' : handleHoverLeaveEvent, 'handle' : false},
 				{'event' : 'mousedown', 'proc' : handleHoverLeaveEvent, 'handle' : false},
@@ -87,8 +99,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				{'event' : 'mousemove', 'handle' : false},
 				{'event' : 'mousewheel', 'handle' : false},
 				{'event' : 'keydown', 'handle' : false},
-				{'event' : 'focus', '$capture_on' : $(window), 'handle' : false},
-				{'event' : 'blur', '$capture_on' : $(window), 'handle' : false},
+				{'event' : 'keyup', 'handle' : false},
 			];
 
 		m_$default_handle_on = $(document);
@@ -106,8 +117,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		var type = e.type;
 		var handled = false;
 
-		for (var i = 0; i < m_Event_handle_map.length; i++) {
-			var c = m_Event_handle_map[i];
+		for (var i = 0; i < m_event_handle_map.length; i++) {
+			var c = m_event_handle_map[i];
 			if (c.event != type) continue;
 
 			if (c.proc) {

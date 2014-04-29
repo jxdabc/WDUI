@@ -15,6 +15,8 @@ function (me, SELF) {
 
 		'invalidateRect',
 
+		'getEventManager',
+
 		'destroy',
 	]);
 
@@ -22,6 +24,7 @@ function (me, SELF) {
 	[
 		$MAP(SELF.EVENT_ID.EVENT_X_LAYOUT, 'onXLayout'),
 		$MAP(SELF.EVENT_ID.EVENT_X_UPDATE, 'onXUpdate'),
+		$CHAIN(UI.XFrame),
 	]);
 
 	var $window = $(window);
@@ -35,7 +38,7 @@ function (me, SELF) {
 	var m_update_scheduled = false;
 	var m_invalidated_rects = [];
 
-	var m_msg_manager = null;
+	var m_event_manager = null;
 
 
 	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
@@ -52,7 +55,7 @@ function (me, SELF) {
 		m_$window_canvas.css('display', 'none');
 		m_$window_canvas.appendTo(m_$window_container);
 
-		m_msg_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
+		m_event_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
 
 		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 	});
@@ -145,6 +148,10 @@ function (me, SELF) {
 
 	});
 
+	$PUBLIC_FUN_IMPL('getEventManager', function(){
+		return m_event_manager;
+	});
+
 	$PUBLIC_FUN_IMPL('destroy', function(){
 
 		me.$PARENT(UI.XFrame).destroy();
@@ -154,7 +161,7 @@ function (me, SELF) {
 		m_update_scheduled = false;	
 		m_invalidated_rects = [];
 
-		m_msg_manager = null;
+		m_event_manager = null;
 
 		m_$window_container = null;
 		m_$window_canvas.remove();
@@ -256,8 +263,8 @@ function (me, SELF) {
 
 			area_sum += c.area();
 
-			console.log('============');
-			console.log(c.toString());
+			// console.log('============');
+			// console.log(c.toString());
 		}
 
 		if (!area_sum) {

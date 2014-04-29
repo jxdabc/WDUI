@@ -16,6 +16,8 @@ function(me, SELF){
 		'getImageWidth',
 		'getImageHeight',
 
+		'isFormattedImage',
+
 		'draw',
 
 		'onImageLoaded',
@@ -28,7 +30,6 @@ function(me, SELF){
 
 	var m_draw_type = 
 		SELF.DrawType.DIT_NORMAL;
-	var m_formatted_img;
 	var m_alpha = 255;
 
 	var m_src_rect = new UI.Rect();
@@ -99,6 +100,11 @@ function(me, SELF){
 			return;
 		}
 
+		if (rc.right == SELF.PART_RECT_FULL_LEN)
+			rc.right = rc.left + m_img.getWidth();
+		if (rc.bottom == SELF.PART_RECT_FULL_LEN)
+			rc.bottom = rc.top + m_img.getHeight();
+
 		if (m_part_rect.equals(rc))
 			return;
 
@@ -117,6 +123,12 @@ function(me, SELF){
 	$PUBLIC_FUN_IMPL('getImageHeight', function () {
 		if (!m_loaded) return 0;
 		return m_img.getHeight();
+	});
+
+	$PUBLIC_FUN_IMPL('isFormattedImage', function(){
+		return m_img.src.indexOf('.normal.') != -1 ||
+			m_img.src.indexOf('.stretch.') != -1 ||
+			m_img.src.indexOf('.9.') != -1;
 	});
 
 	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
@@ -181,6 +193,12 @@ function(me, SELF){
 		releaseBuffer();
 
 		loadFormattedImageInfo();
+		if (m_unloaded_part_rect) {
+			if (m_unloaded_part_rect.right == SELF.PART_RECT_FULL_LEN)
+				m_unloaded_part_rect.right = m_unloaded_part_rect.left + m_img.getWidth();
+			if (m_unloaded_part_rect.bottom == SELF.PART_RECT_FULL_LEN)
+				m_unloaded_part_rect.bottom = m_unloaded_part_rect.top + m_img.getHeight();
+		}
 		m_draw_type = m_unloaded_draw_type || m_draw_type;
 		m_part_rect = m_unloaded_part_rect || m_part_rect;
 
@@ -305,19 +323,15 @@ function(me, SELF){
 
 
 	function loadFormattedImageInfo() {
-		m_formatted_img = true;
 		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
 			m_draw_type = SELF.DrawType.DIT_NORMAL;
 		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
 			m_draw_type = SELF.DrawType.DIT_STRETCH;
 		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
 			m_draw_type = SELF.DrawType.DIT_9PART;
-			if (m_unloaded_part_rect) m_part_rect = m_unloaded_part_rect;
-			else loadFormattedImagePartInfo();
+			if (!m_unloaded_part_rect) loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
 		}
-		else
-			m_formatted_img = false;
 	}
 
 	function loadFormattedImagePartInfo() {
@@ -390,4 +404,7 @@ function(me, SELF){
 	
 	
 
+})
+.$STATIC({
+	'PART_RECT_FULL_LEN' : -1,
 });

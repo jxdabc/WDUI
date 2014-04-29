@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XDialog title_width="470" title_height="35" bg="skin/dialog/bg.9.png">
+  <XDock dock_type="right2left" align_type="middle" left="0" top="0" width="470" height="20">
+    <XButton width="wrap_content" height="wrap_content" name="sys_close" face="@img/ctrl/sysbtn_close.png" margin_right="5"></XButton>
+  </XDock>
+  <XStatic text="The world is like a mirror: Frown at it and it frowns at you; smile, and it smiles too." text_align_v="middle" text_align_h="center" left="0" top="35" font_size="12" width="reach_parent" height="reach_parent" margin_bottom="30"></XStatic>
+</XDialog>

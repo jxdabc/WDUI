@@ -84,8 +84,9 @@
 	}
 
 	function getImage(relative_path) {
-		var img = new XImageWeb();
-		return img.load('@' + relative_path);
+		var img = new UI.XImageCanvasImage();
+		img.load('@' + relative_path);
+		return img;
 	}
 
 })();

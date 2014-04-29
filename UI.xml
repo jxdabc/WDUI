@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XWindow left="0" top="20" width="800" resizable="true" title_left="0" title_top="0" title_width="reach_window" title_height="67" height="600" bg="skin/bgalpha.9.png">
+  <XFrame bg="skin/headbg.png" bg_type="stretch" width="reach_parent" height="66"></XFrame>
+  <XStatic text="Leo &amp; Bean's Test Window" left="10" top="10" font="arial" font_size="14" font_style="" width="200" height="20"></XStatic>
+  <XDock dock_type="right2left" align_type="middle" left="0" top="0" width="reach_parent" height="20">
+    <XButton name="sys_close" face="@img/ctrl/sysbtn_close.png" margin_right="5" width="wrap_content" height="wrap_content"></XButton>
+    <XMultifaceButton name="sys_max" faces="@img/ctrl/sysbtn_max.png|@img/ctrl/sysbtn_restore.png" start_face="0" width="wrap_content" height="wrap_content"></XMultifaceButton>
+    <XButton name="sys_min" face="@img/ctrl/sysbtn_min.png" width="wrap_content" height="wrap_content"></XButton>
+  </XDock>
+  <XDock dock_type="right2left" align_type="middle" left="0" top="30" width="reach_parent" height="15">
+    <XSysControl type="edit" width="200" height="15" margin_right="20"></XSysControl>
+  </XDock>
+  <XSysControl type="edit" left="200" top="50" width="reach_parent" height="15" margin_right="20"></XSysControl>
+  <XButton name="dialog_button" left="10" top="40" width="80" height="23">
+    <XStatic width="80" height="15" top="4" text_align_v="middle" text_align_h="center" font_style="bold" font="Times New Roman" text="DIALOG"></XStatic>
+  </XButton>
+  <XScrollFrame top="70" left="150" width="reach_parent" height="100" h_scroll="true" v_scroll="true" margin_right="20">
+    <XFrame bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame left="130" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame left="260" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame left="390" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame left="520" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame left="650" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="40" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="80" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="120" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="160" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="200" bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
+    <XFrame top="40" left="130" bg="skin/headbg.png" bg_type="stretch" width="500" height="100">
+      <XEdit top="10" left="20" width="300" height="20"></XEdit>
+    </XFrame>
+  </XScrollFrame>
+  <XScrollFrame margin_bottom="35" left="150" top="190" width="270" height="reach_parent" h_scroll="true" v_scroll="true">
+    <XTree width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="unfolded" child_item_indent="20">
+      <XStatic margin_top="5" width="160" height="20" text="Computer Science" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+      <XTree margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
+        <XStatic margin_top="5" width="160" height="20" text="Artificial Intelligence" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+        <XStatic margin_top="5" width="160" height="20" text="Machine Learning" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+        <XTree margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
+          <XStatic margin_top="5" width="160" height="20" text="NLP" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Speech Input &amp; Output" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Natural Language Understanding" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Language Generation" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Machine Translation" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="IR &amp; IE" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Automatic Summarization" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XStatic margin_top="5" width="160" height="20" text="Document Categorization" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+          <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30"></XFrame>
+          <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30">
+            <XEdit bg="skin/headbg.png" margin_top="5" top="5" left="6" width="150" height="20" />
+          </XFrame>
+          <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30"></XFrame>
+        </XTree>
+        <XStatic margin_top="5" width="160" height="20" text="Pattern Recognition" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+      </XTree>
+      <XStatic margin_top="5" width="160" height="20" text="Computer Architecture" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+      <XStatic margin_top="5" width="160" height="20" text="Database" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
+      <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30"></XFrame>
+      <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30"></XFrame>
+      <XFrame margin_top="5" bg="skin/headbg.png" bg_type="stretch" width="165" height="30">
+        <XEdit bg="skin/headbg.png" margin_top="5" top="5" left="6" width="150" height="20" />
+      </XFrame>
+    </XTree>
+  </XScrollFrame>
+  <XScrollFrame name="test" top="70" width="140" height="reach_parent" v_scroll="true" margin_bottom="35">
+    <XDock dock_type="top2bottom" align_type="middle" width="125" height="wrap_content">
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="George" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="John" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Thomas" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="James" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="James" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="John" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Andrew" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Martin" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="William" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="John" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="James" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Zachary" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Millard" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Franklin" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="James" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Abraham" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Andrew" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Ulysses" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Ruther" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="James" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/gjgj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Chester" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjbk.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Stephen" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjsj.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Benjamin" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XDock dock_type="left2right" align_type="middle" width="115" height="40" touchable="true" selectable="true" mouse_click_select="true" mouse_click_unselect="true">
+        <XFrame bg="skin/rjxz.png" width="34" height="34" margin_left="10"></XFrame>
+        <XStatic width="70" height="reach_parent" text="Stephen" text_align_v="middle" text_align_h="center" font_size="14"></XStatic>
+      </XDock>
+      <XAnimation width="wrap_content" height="wrap_content" margin_top="10" margin_bottom="10" frames="@img/ctrl/waiting.png" frame_count="18" switch_interval="30" />
+      <XStatic text="Test for the wrap content feature of XStatic: The world is like a mirror: Frown at it and it frowns at you; smile, and it smiles too." text_align_v="top" text_align_h="center" left="0" top="35" font_size="12" width="wrap_content" height="wrap_content"></XStatic>
+    </XDock>
+  </XScrollFrame>
+</XWindow>

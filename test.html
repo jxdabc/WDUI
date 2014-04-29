@@ -14,6 +14,21 @@
 
 	$CLASS('TEST', function(me){});
 
+	// xml test. 
+	(function(){
+
+		$.get('UI.xml')
+			.done(function(xml){
+				console.log(xml);
+				test = xml;
+			});
+
+
+
+	})
+	()
+	;
+
 	// test frame
 	(function(){
 
@@ -28,10 +43,11 @@
 				$MAP('mousedown', 'test_event'),
 				$MAP('mousemove', 'test_event'),
 				$MAP('mouseup', 'test_event'),
+				$CHAIN(UI.XFrame),
 			]);
 
 			$MESSAGE_HANDLER('test_event', function(e){
-				console.log(me.getName(), e);
+//				console.log(me.getName(), e);
 			});
 		});
 
@@ -72,6 +88,10 @@
 		layout.margin_right = 30;
 		innerinner.create(inner, layout, UI.XFrame.Visibility.VISIBILITY_SHOW);
 		innerinner.setName('innerinner');
+		innerinner.setTouchable(true);
+		innerinner.setSelectable(true);
+		innerinner.setSelectWhenMouseClick(true);
+		innerinner.setUnselectWhenMouseClick(true);
 		var img = new UI.XImageCanvasImage();
 		img.load('skin/headbg.png');
 		img.setDrawType(UI.XImageCanvasImage.DrawType.DIT_STRETCH);
