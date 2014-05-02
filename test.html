@@ -4,6 +4,9 @@
 
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
+<div id="test_div2" style="width:80%;height:1000px; border:1px solid red;margin-bottom:20px;">
+</div>
+
 <div id="test_div" style="width:80%;height:600px; border:1px solid red;margin-bottom:20px;">
 </div>
 
@@ -16,15 +19,10 @@
 
 	// xml test. 
 	(function(){
-
 		$.get('UI.xml')
 			.done(function(xml){
-				console.log(xml);
-				test = xml;
+				var frame = UI.XFrameXMLFactory.instance().buildFrame(xml.documentElement, $('#test_div2')[0]);
 			});
-
-
-
 	})
 	()
 	;
@@ -48,6 +46,7 @@
 
 			$MESSAGE_HANDLER('test_event', function(e){
 //				console.log(me.getName(), e);
+//				UI.XFrameXMLFactory.instance().buildFrame();
 			});
 		});
 
@@ -100,9 +99,9 @@
 
 		var i = 0;
 		setInterval(function(){
-			console.log('win' + win.getRect().toString());
-			console.log('inner:' + inner.getRect().toString());
-			console.log('innerinner:' + innerinner.getRect().toString());
+			// console.log('win' + win.getRect().toString());
+			// console.log('inner:' + inner.getRect().toString());
+			// console.log('innerinner:' + innerinner.getRect().toString());
 
 
 			if (i < 3) {

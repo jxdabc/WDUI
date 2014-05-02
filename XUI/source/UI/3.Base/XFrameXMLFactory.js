@@ -18,7 +18,7 @@
 				return null;
 			}
 
-			frame_class.buildFromXML(xml_node, parent);
+			var frame = frame_class.buildFromXML(xml_node, parent);
 
 			frame.configFrameByXML(xml_node);
 
@@ -32,6 +32,7 @@
 		'buildImage' : buildImage,
 		'buildImageList' : buildImageList,
 		'buildRect' : buildRect,
+		'buildText' : buildText,
 
 		'SPLIT_REGEXP' : /\|/,
 	});
@@ -60,6 +61,7 @@
 		if (!type_name || !(type = xml_node.getAttribute(type_name)))
 			if (!image.isFormattedImage())
 				type = default_type || 'normal';
+		type = type || '';
 
 		switch(type.toLowerCase()) {
 			case 'normal' 	: image.setDrawType(UI.IXImage.DrawType.DIT_NORMAL); break;
@@ -182,7 +184,7 @@
 		return rst;
 	}
 
-	function buildRect(xml_node, rect_prefix) {
+	function buildRect(xml_node, rect_prefix /* = null*/) {
 		var rect = new UI.Rect(0,0,0,0);
 		rect_prefix = rect_prefix || '';
 		rect.left =  xml_node.getAttribute(rect_prefix + 'left') - 0 || 0;
@@ -192,6 +194,57 @@
 		rect.bottom = xml_node.getAttribute(rect_prefix + 'height') - 0 || 0;
 		rect.bottom += rect.top;
 		return rect;
+	}
+
+	function buildText(xml_node, text_prefix /* = null */) {
+		var text = new UI.XTextCanvasText();
+
+		text_prefix = text_prefix || '';
+		text.setText(xml_node.getAttribute(text_prefix + 'text') || '');
+
+		var font_face = 'Arial, \'Microsoft YaHei\'';
+		var font_size = 12;
+		var font_style = UI.XTextCanvasText.Style.STYLE_NORMAL;
+
+		var attr_name;
+
+		font_face = xml_node.getAttribute(text_prefix + 'font') || font_face;
+		
+		attr_name = text_prefix + 'font_size';
+		if (xml_node.hasAttribute(attr_name))
+			font_size = xml_node.getAttribute(attr_name) - 0 || 0;
+
+		var font_style_attr = xml_node.getAttribute(text_prefix + 'font_style') || '';
+		font_style_attr = font_style_attr.toLowerCase();
+		if (font_style_attr.indexOf('bold') != -1) font_style |= UI.XTextCanvasText.Style.STYLE_BOLD;
+		if (font_style_attr.indexOf('italic') != -1) font_style |= UI.XTextCanvasText.Style.STYLE_ITARIC;
+
+		text.setFont(font_face, font_size, font_style);
+
+		var align_h = UI.XTextCanvasText.Align.ALIGN_START;
+		var align_v = UI.XTextCanvasText.Align.ALIGN_START;
+
+		var align_h_attr = xml_node.getAttribute(text_prefix + 'text_align_h') || '';
+		var align_v_attr = xml_node.getAttribute(text_prefix + 'text_align_v') || '';
+		align_h_attr = align_h_attr.toLowerCase();
+		align_v_attr = align_v_attr.toLowerCase();
+
+		if (align_h_attr == 'center') align_h = UI.XTextCanvasText.Align.ALIGN_MIDDLE;
+		else if (align_h_attr == 'right') align_h = UI.XTextCanvasText.Align.ALIGN_END;
+
+		if (align_v_attr == 'middle') align_v = UI.XTextCanvasText.Align.ALIGN_MIDDLE;
+		else if (align_v_attr == 'bottom') align_v = UI.XTextCanvasText.Align.ALIGN_END;
+
+		text.setAlignment(align_h, align_v);
+
+		attr_name = text_prefix + 'text_color';
+		if (xml_node.hasAttribute(attr_name)) {
+			var color = xml_node.getAttribute(attr_name);
+			color = '#' + color;
+			text.setColor(color);
+		}
+
+		return text;
 	}
 
 })();

@@ -13,11 +13,13 @@
 
 			'create',
 			'configFrameByXML',
+			'handleXMLChildNode',
 
 			'setVisibility',
 			'getVisibility',
 
 			'setBackground',
+			'getBackground',
 			'onBackgroundLoaded',
 			'setMouseOverLayer',
 			'onMouseOverLayerLoaded',
@@ -50,6 +52,8 @@
 			'measureHeight',
 			'getMeasuredWidth',
 			'getMeasuredHeight',
+			'setMeasuredWidth',
+			'setMeasuredHeight',
 			'layout',
 
 			'onMeasureWidth',
@@ -67,7 +71,7 @@
 
 			'paintUI',
 			'paintBackground',
-			'paintForground',
+			'paintForeground',
 
 			'addNotificationListener',
 			'removeNofiticationListener',
@@ -183,7 +187,55 @@
 		});
 
 		$PUBLIC_FUN_IMPL('configFrameByXML', function(xml_node){
-			
+
+			var background = UI.XFrameXMLFactory.buildImage(xml_node, 'bg', 'bg_type', 'stretch', 'bg_part_');
+			if (background) me.setBackground(background);
+
+			var touchable = xml_node.getAttribute('touchable') || '';
+			if (touchable.toLowerCase() == 'true') me.setTouchable(true);
+			var mouse_over_layer = 
+				UI.XFrameXMLFactory.buildImage(xml_node, 'mouse_over_layer', 'mouse_over_layer_type', 'stretch', 'mouse_over_layer_part_');
+			if (mouse_over_layer) me.setMouseOverLayer(mouse_over_layer);
+			var mouse_down_layer =
+				UI.XFrameXMLFactory.buildImage(xml_node, 'mouse_down_layer', 'mouse_down_layer_type', 'stretch', 'mouse_down_layer_part_');
+			if (mouse_down_layer) me.setMouseDownLayer(mouse_down_layer);
+
+			var selectable = xml_node.getAttribute('selectable') || '';
+			if (selectable.toLowerCase() == 'true') me.setSelectable(true);
+			var mouse_click_select = xml_node.getAttribute('mouse_click_select') || '';
+			if (mouse_click_select.toLowerCase() == 'true') me.setSelectWhenMouseClick(true);
+			var mouse_click_unselect = xml_node.getAttribute('mouse_click_unselect') || '';
+			if (mouse_click_unselect.toLowerCase() == 'true') me.setUnselectWhenMouseClick(true);
+			var selected = xml_node.getAttribute('selected') || '';
+			if (selected.toLowerCase() == 'true') me.setSelectedState(true);
+			var selected_layer = 
+				UI.XFrameXMLFactory.buildImage(xml_node, 'selected_layer', 'selected_layer_type', 'stretch', 'selected_layer_part_');
+			if (selected_layer) me.setSelectedLayer(selected_layer);
+
+			me.setName(xml_node.getAttribute('name') || '');
+
+			me.handleXMLChildNode(xml_node);
+
+			var visible = xml_node.getAttribute('visible') || '';
+			visible = visible.toLowerCase();
+			if (!visible || visible == 'show')
+				me.setVisibility(SELF.Visibility.VISIBILITY_SHOW);
+			else if (visible == 'hide')
+				me.setVisibility(SELF.Visibility.VISIBILITY_HIDE);
+			else if (visible == 'none')
+				me.setVisibility(SELF.Visibility.VISIBILITY_NONE);
+			else
+				me.setVisibility(SELF.Visibility.VISIBILITY_SHOW);
+
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node){
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+				UI.XFrameXMLFactory.instance().buildFrame(c, me.$THIS);
+			}
 		});
 
 		$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(layout_param){
@@ -290,6 +342,10 @@
 
 			return old;
 		});
+
+		$PUBLIC_FUN_IMPL('getBackground', function(){
+			return m_background;
+		})
 
 		$PUBLIC_FUN_IMPL('onBackgroundLoaded', function(){
 			me.invalidateRect();
@@ -550,7 +606,7 @@
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
 				return;
 			me.paintBackground(ctx, rect);
-			me.paintForground(ctx, rect);
+			me.paintForeground(ctx, rect);
 		});
 
 		$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
@@ -558,7 +614,7 @@
 				m_background.draw(ctx, rect);
 		});
 
-		$PUBLIC_FUN_IMPL('paintForground', function(ctx, rect) {
+		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect) {
 			if (m_selectable && m_selected_state) {
 				fillSelectedLayer();
 				m_selected_layer.draw(ctx, rect);
@@ -808,6 +864,14 @@
 
 		$PUBLIC_FUN_IMPL('getMeasuredHeight', function(){
 			return m_measured_height;
+		});
+
+		$PUBLIC_FUN_IMPL('setMeasuredWidth', function(v){
+			m_measured_width = v;
+		});
+		
+		$PUBLIC_FUN_IMPL('setMeasuredHeight', function(v){
+			m_measured_height = v;
 		});
 
 		$PUBLIC_FUN_IMPL('layout', function(rc){

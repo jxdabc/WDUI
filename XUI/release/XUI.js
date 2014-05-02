@@ -11097,6 +11097,27 @@ $CLASS('UI.Pt', function(me){
 	});
 
 });
+;
+
+(function(){
+	$CLASS('UI.ImageUtil', function(me,SELF){
+
+	}).
+	$STATIC({
+		getImageDataRGBA : getImageDataRGBA,
+	});
+
+	function getImageDataRGBA(data, x, y, img_width, debug){
+		var r,g,b,a;
+		var base = (y * img_width + x) * 4;
+		r = data[base], g = data[base + 1], b = data[base + 2], a = data[base + 3];
+		if (debug) console.log('x == x: '  + base);
+		return r << 24 | g << 16 | b << 8 | a;
+	}
+
+})();
+
+
 $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 	$PUBLIC_FUN({
@@ -11122,11 +11143,13 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			'create',
 			'configFrameByXML',
+			'handleXMLChildNode',
 
 			'setVisibility',
 			'getVisibility',
 
 			'setBackground',
+			'getBackground',
 			'onBackgroundLoaded',
 			'setMouseOverLayer',
 			'onMouseOverLayerLoaded',
@@ -11159,6 +11182,8 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			'measureHeight',
 			'getMeasuredWidth',
 			'getMeasuredHeight',
+			'setMeasuredWidth',
+			'setMeasuredHeight',
 			'layout',
 
 			'onMeasureWidth',
@@ -11176,7 +11201,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			'paintUI',
 			'paintBackground',
-			'paintForground',
+			'paintForeground',
 
 			'addNotificationListener',
 			'removeNofiticationListener',
@@ -11292,7 +11317,55 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		});
 
 		$PUBLIC_FUN_IMPL('configFrameByXML', function(xml_node){
-			
+
+			var background = UI.XFrameXMLFactory.buildImage(xml_node, 'bg', 'bg_type', 'stretch', 'bg_part_');
+			if (background) me.setBackground(background);
+
+			var touchable = xml_node.getAttribute('touchable') || '';
+			if (touchable.toLowerCase() == 'true') me.setTouchable(true);
+			var mouse_over_layer = 
+				UI.XFrameXMLFactory.buildImage(xml_node, 'mouse_over_layer', 'mouse_over_layer_type', 'stretch', 'mouse_over_layer_part_');
+			if (mouse_over_layer) me.setMouseOverLayer(mouse_over_layer);
+			var mouse_down_layer =
+				UI.XFrameXMLFactory.buildImage(xml_node, 'mouse_down_layer', 'mouse_down_layer_type', 'stretch', 'mouse_down_layer_part_');
+			if (mouse_down_layer) me.setMouseDownLayer(mouse_down_layer);
+
+			var selectable = xml_node.getAttribute('selectable') || '';
+			if (selectable.toLowerCase() == 'true') me.setSelectable(true);
+			var mouse_click_select = xml_node.getAttribute('mouse_click_select') || '';
+			if (mouse_click_select.toLowerCase() == 'true') me.setSelectWhenMouseClick(true);
+			var mouse_click_unselect = xml_node.getAttribute('mouse_click_unselect') || '';
+			if (mouse_click_unselect.toLowerCase() == 'true') me.setUnselectWhenMouseClick(true);
+			var selected = xml_node.getAttribute('selected') || '';
+			if (selected.toLowerCase() == 'true') me.setSelectedState(true);
+			var selected_layer = 
+				UI.XFrameXMLFactory.buildImage(xml_node, 'selected_layer', 'selected_layer_type', 'stretch', 'selected_layer_part_');
+			if (selected_layer) me.setSelectedLayer(selected_layer);
+
+			me.setName(xml_node.getAttribute('name') || '');
+
+			me.handleXMLChildNode(xml_node);
+
+			var visible = xml_node.getAttribute('visible') || '';
+			visible = visible.toLowerCase();
+			if (!visible || visible == 'show')
+				me.setVisibility(SELF.Visibility.VISIBILITY_SHOW);
+			else if (visible == 'hide')
+				me.setVisibility(SELF.Visibility.VISIBILITY_HIDE);
+			else if (visible == 'none')
+				me.setVisibility(SELF.Visibility.VISIBILITY_NONE);
+			else
+				me.setVisibility(SELF.Visibility.VISIBILITY_SHOW);
+
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node){
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+				UI.XFrameXMLFactory.instance().buildFrame(c, me.$THIS);
+			}
 		});
 
 		$PUBLIC_FUN_IMPL('beginUpdateLayoutParam', function(layout_param){
@@ -11399,6 +11472,10 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			return old;
 		});
+
+		$PUBLIC_FUN_IMPL('getBackground', function(){
+			return m_background;
+		})
 
 		$PUBLIC_FUN_IMPL('onBackgroundLoaded', function(){
 			me.invalidateRect();
@@ -11659,7 +11736,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
 				return;
 			me.paintBackground(ctx, rect);
-			me.paintForground(ctx, rect);
+			me.paintForeground(ctx, rect);
 		});
 
 		$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
@@ -11667,7 +11744,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 				m_background.draw(ctx, rect);
 		});
 
-		$PUBLIC_FUN_IMPL('paintForground', function(ctx, rect) {
+		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect) {
 			if (m_selectable && m_selected_state) {
 				fillSelectedLayer();
 				m_selected_layer.draw(ctx, rect);
@@ -11917,6 +11994,14 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('getMeasuredHeight', function(){
 			return m_measured_height;
+		});
+
+		$PUBLIC_FUN_IMPL('setMeasuredWidth', function(v){
+			m_measured_width = v;
+		});
+		
+		$PUBLIC_FUN_IMPL('setMeasuredHeight', function(v){
+			m_measured_height = v;
 		});
 
 		$PUBLIC_FUN_IMPL('layout', function(rc){
@@ -12367,348 +12452,368 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 
 
-$CLASS('UI.XWindow', 
-$EXTENDS(UI.XFrame),
-function (me, SELF) {
+;
 
-	$PUBLIC_FUN([
-		'create',
+(function(){
+	$CLASS('UI.XWindow', 
+	$EXTENDS(UI.XFrame),
+	function (me, SELF) {
 
-		'endUpdateLayoutParam',
-		'invalidateLayout',
-		'isLayouting',
+		$PUBLIC_FUN([
+			'create',
 
-		'setRect',
+			'endUpdateLayoutParam',
+			'invalidateLayout',
+			'isLayouting',
 
-		'setVisibility',
+			'setRect',
 
-		'invalidateRect',
+			'setVisibility',
 
-		'getEventManager',
+			'invalidateRect',
 
-		'destroy',
-	]);
+			'getEventManager',
 
-	$MESSAGE_MAP('EVENT', 
-	[
-		$MAP(SELF.EVENT_ID.EVENT_X_LAYOUT, 'onXLayout'),
-		$MAP(SELF.EVENT_ID.EVENT_X_UPDATE, 'onXUpdate'),
-		$CHAIN(UI.XFrame),
-	]);
+			'destroy',
+		]);
 
-	var $window = $(window);
+		$MESSAGE_MAP('EVENT', 
+		[
+			$MAP(SELF.EVENT_ID.EVENT_X_LAYOUT, 'onXLayout'),
+			$MAP(SELF.EVENT_ID.EVENT_X_UPDATE, 'onXUpdate'),
+			$CHAIN(UI.XFrame),
+		]);
 
-	var m_$window_container = null;
-	var m_$window_canvas = null;
+		var $window = $(window);
 
-	var m_layout_scheduled = false;
-	var m_is_layouting = false;
+		var m_$window_container = null;
+		var m_$window_canvas = null;
 
-	var m_update_scheduled = false;
-	var m_invalidated_rects = [];
+		var m_layout_scheduled = false;
+		var m_is_layouting = false;
 
-	var m_event_manager = null;
+		var m_update_scheduled = false;
+		var m_invalidated_rects = [];
 
-
-	$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
-
-		visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
-
-		m_$window_container = $(container);
-		m_$window_container.css('position', 'relative');
-
-		m_$window_canvas = $('<canvas></canvas>');
-		m_$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
-		m_$window_canvas.css('position', 'absolute');
-		m_$window_canvas.prop('width', 0).prop('height', 0);
-		m_$window_canvas.css('display', 'none');
-		m_$window_canvas.appendTo(m_$window_container);
-
-		m_event_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
-
-		me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
-	});
+		var m_event_manager = null;
 
 
-	$PUBLIC_FUN_IMPL('setRect', function(new_rect){
-		var old = me.getRect();
+		$PUBLIC_FUN_IMPL('create', function(container, layout_param, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/){
 
-		if (old.equals(new_rect))
-			return;
+			visibility = visibility || SELF.Visibility.VISIBILITY_NONE;
 
-		m_$window_canvas.css({
-			'left' 		: new_rect.left,
-			'top'		: new_rect.top,
+			m_$window_container = $(container);
+			m_$window_container.css('position', 'relative');
+
+			m_$window_canvas = $('<canvas></canvas>');
+			m_$window_canvas.css('z-index', SELF.Z_CANVAS_LAYER + '');
+			m_$window_canvas.css('position', 'absolute');
+			m_$window_canvas.prop('width', 0).prop('height', 0);
+			m_$window_canvas.css('display', 'none');
+			m_$window_canvas.appendTo(m_$window_container);
+
+			m_event_manager = new UI.XFrameEventMgr(me.$THIS, m_$window_canvas);
+
+			me.$PARENT(UI.XFrame).create(null, layout_param, visibility);
 		});
 
-		me.$PARENT(UI.XFrame).setRect(new_rect);
-	});
 
-	$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function(){
+		$PUBLIC_FUN_IMPL('setRect', function(new_rect){
+			var old = me.getRect();
 
-		var delayed = 
-			me.$PARENT(UI.XFrame).endUpdateLayoutParam();
+			if (old.equals(new_rect))
+				return;
 
-		if (!delayed) {
-			schedule_layout();
-		}
+			m_$window_canvas.css({
+				'left' 		: new_rect.left,
+				'top'		: new_rect.top,
+			});
 
-		return delayed;
-	});
-
-	$PUBLIC_FUN_IMPL('invalidateLayout', function() {
-
-		me.$PARENT(UI.XFrame).invalidateLayout();
-
-		schedule_layout();
-	});
-
-	$PUBLIC_FUN_IMPL('isLayouting', function(){
-		return m_is_layouting;
-	});
-
-	$PUBLIC_FUN_IMPL('setVisibility', function(visibility) {
-
-		if (visibility == me.getVisibility())
-			return;
-
-		switch (visibility) {
-			case SELF.Visibility.VISIBILITY_NONE:
-				m_$window_canvas.css('display', 'none');
-				break;
-			case SELF.Visibility.VISIBILITY_HIDE:
-				m_$window_canvas.css('display', 'block');
-				m_$window_canvas.css('visibility', 'hidden');
-				break;
-			case SELF.Visibility.VISIBILITY_SHOW:
-				m_$window_canvas.css('display', 'block');
-				m_$window_canvas.css('visibility', 'visible');
-				break;
-		}
-		
-		me.$PARENT(UI.XFrame).setVisibility(visibility);
-	});
-
-	$PUBLIC_FUN_IMPL('invalidateRect', function(rect) {
-
-		if (typeof rect == 'undefined') {
-			me.$PARENT(UI.XFrame).invalidateRect();
-			return;
-		}
-
-		var rect_frame = me.getRect();
-
-		var rect_real = rect.intersect(
-			new UI.Rect(0, 0, rect_frame.width(), rect_frame.height()));
-		if (rect_real.isEmpty())
-			return;
-
-		m_invalidated_rects.push(rect_real);
-
-		if (m_update_scheduled)
-			return;
-
-		m_update_scheduled = true;
-
-		UI.XEventService.instance().postFrameEvent(me.$THIS, 
-		{
-			'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+			me.$PARENT(UI.XFrame).setRect(new_rect);
 		});
 
-	});
+		$PUBLIC_FUN_IMPL('endUpdateLayoutParam', function(){
 
-	$PUBLIC_FUN_IMPL('getEventManager', function(){
-		return m_event_manager;
-	});
+			var delayed = 
+				me.$PARENT(UI.XFrame).endUpdateLayoutParam();
 
-	$PUBLIC_FUN_IMPL('destroy', function(){
-
-		me.$PARENT(UI.XFrame).destroy();
-		
-		m_layout_scheduled = false;
-		m_is_layouting = false;
-		m_update_scheduled = false;	
-		m_invalidated_rects = [];
-
-		m_event_manager = null;
-
-		m_$window_container = null;
-		m_$window_canvas.remove();
-		m_$window_canvas = null;
-		
-	});
-
-	$MESSAGE_HANDLER('onXLayout', function(){
-		if (!m_layout_scheduled) return;
-
-		m_layout_scheduled = false;
-
-		m_is_layouting = true;
-
-		var layout_param = me.getLayoutParam();
-
-		var map_pos = {
-			'width' : 'x',
-			'height' : 'y'
-		};
-
-		var map_margin = {
-			'width' : 'margin_right',
-			'height' : 'margin_bottom'
-		};
-
-		var listen_page_resize = 
-			(layout_param.width.instanceOf && layout_param.width.instanceOf(UI.XFrame.LayoutParam.SpecialMetrics)) ||
-			(layout_param.height.instanceOf && layout_param.height.instanceOf(UI.XFrame.LayoutParam.SpecialMetrics));
-
-		if (listen_page_resize) $window.on('resize', onPageResize);
-		else $window.off('resize', onPageResize);
-
-		$.each(['width', 'height'], function(i,v){
-
-			var param_for_measure = new SELF.MeasureParam();
-
-			switch(layout_param[v]) {
-			case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
-				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
-				param_for_measure.num = m_$window_container[v]();
-			default: 
-				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-				param_for_measure.num = 
-					layout_param[v] ==
-						SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT ?
-							m_$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
-							layout_param[v];
-				break;
+			if (!delayed) {
+				schedule_layout();
 			}
 
-			me['measure' + v.upperFirst()](param_for_measure);
+			return delayed;
 		});
 
-		me.layout(
-			new UI.Rect(
-				new UI.Pt(layout_param.x, layout_param.y),
-				new UI.Size(me.getMeasuredWidth(), me.getMeasuredHeight())
-			)
-		);
+		$PUBLIC_FUN_IMPL('invalidateLayout', function() {
 
-		m_is_layouting = false;
-	});
-	
-	$MESSAGE_HANDLER('onXUpdate', function(){
-		if (!m_update_scheduled) return;
+			me.$PARENT(UI.XFrame).invalidateLayout();
 
-		var event_service = UI.XEventService.instance();
+			schedule_layout();
+		});
 
+		$PUBLIC_FUN_IMPL('isLayouting', function(){
+			return m_is_layouting;
+		});
 
-		if (m_layout_scheduled || 
-			event_service.hasPendingEvent(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT))
-			event_service.postFrameEvent(me.$THIS, 
+		$PUBLIC_FUN_IMPL('setVisibility', function(visibility) {
+
+			if (visibility == me.getVisibility())
+				return;
+
+			switch (visibility) {
+				case SELF.Visibility.VISIBILITY_NONE:
+					m_$window_canvas.css('display', 'none');
+					break;
+				case SELF.Visibility.VISIBILITY_HIDE:
+					m_$window_canvas.css('display', 'block');
+					m_$window_canvas.css('visibility', 'hidden');
+					break;
+				case SELF.Visibility.VISIBILITY_SHOW:
+					m_$window_canvas.css('display', 'block');
+					m_$window_canvas.css('visibility', 'visible');
+					break;
+			}
+			
+			me.$PARENT(UI.XFrame).setVisibility(visibility);
+		});
+
+		$PUBLIC_FUN_IMPL('invalidateRect', function(rect) {
+
+			if (typeof rect == 'undefined') {
+				me.$PARENT(UI.XFrame).invalidateRect();
+				return;
+			}
+
+			var rect_frame = me.getRect();
+
+			var rect_real = rect.intersect(
+				new UI.Rect(0, 0, rect_frame.width(), rect_frame.height()));
+			if (rect_real.isEmpty())
+				return;
+
+			m_invalidated_rects.push(rect_real);
+
+			if (m_update_scheduled)
+				return;
+
+			m_update_scheduled = true;
+
+			UI.XEventService.instance().postFrameEvent(me.$THIS, 
 			{
 				'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
 			});
 
+		});
 
-		m_update_scheduled = false;
+		$PUBLIC_FUN_IMPL('getEventManager', function(){
+			return m_event_manager;
+		});
 
-		var area_sum = 0;
-		var area_bound = 0;
+		$PUBLIC_FUN_IMPL('destroy', function(){
 
-		if (!m_invalidated_rects.length)
-			return;
+			me.$PARENT(UI.XFrame).destroy();
+			
+			m_layout_scheduled = false;
+			m_is_layouting = false;
+			m_update_scheduled = false;	
+			m_invalidated_rects = [];
 
-		var rect_bound = new UI.Rect(m_invalidated_rects[0]);
+			m_event_manager = null;
 
-		for (var i = 0; i < m_invalidated_rects.length; i++) {
+			m_$window_container = null;
+			m_$window_canvas.remove();
+			m_$window_canvas = null;
+			
+		});
 
-			var c = m_invalidated_rects[i];
+		$MESSAGE_HANDLER('onXLayout', function(){
+			if (!m_layout_scheduled) return;
 
-			if (i != 0) {
-				rect_bound.left = Math.min(rect_bound.left, c.left);
-				rect_bound.top = Math.min(rect_bound.top, c.top);
-				rect_bound.right = Math.max(rect_bound.right, c.right);
-				rect_bound.bottom = Math.max(rect_bound.bottom, c.bottom);
+			m_layout_scheduled = false;
+
+			m_is_layouting = true;
+
+			var layout_param = me.getLayoutParam();
+
+			var map_pos = {
+				'width' : 'x',
+				'height' : 'y'
+			};
+
+			var map_margin = {
+				'width' : 'margin_right',
+				'height' : 'margin_bottom'
+			};
+
+			var listen_page_resize = 
+				(layout_param.width.instanceOf && layout_param.width.instanceOf(UI.XFrame.LayoutParam.SpecialMetrics)) ||
+				(layout_param.height.instanceOf && layout_param.height.instanceOf(UI.XFrame.LayoutParam.SpecialMetrics));
+
+			if (listen_page_resize) $window.on('resize', onPageResize);
+			else $window.off('resize', onPageResize);
+
+			$.each(['width', 'height'], function(i,v){
+
+				var param_for_measure = new SELF.MeasureParam();
+
+				switch(layout_param[v]) {
+				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
+					param_for_measure.num = m_$window_container[v]();
+				default: 
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = 
+						layout_param[v] ==
+							SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT ?
+								m_$window_container[v]() - layout_param[map_pos[v]] - layout_param[map_margin[v]] : 
+								layout_param[v];
+					break;
+				}
+
+				me['measure' + v.upperFirst()](param_for_measure);
+			});
+
+			me.layout(
+				new UI.Rect(
+					new UI.Pt(layout_param.x, layout_param.y),
+					new UI.Size(me.getMeasuredWidth(), me.getMeasuredHeight())
+				)
+			);
+
+			m_is_layouting = false;
+		});
+		
+		$MESSAGE_HANDLER('onXUpdate', function(){
+			if (!m_update_scheduled) return;
+
+			var event_service = UI.XEventService.instance();
+
+
+			if (m_layout_scheduled || 
+				event_service.hasPendingEvent(UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT))
+				event_service.postFrameEvent(me.$THIS, 
+				{
+					'id' : SELF.EVENT_ID.EVENT_X_UPDATE,
+				});
+
+
+			m_update_scheduled = false;
+
+			var area_sum = 0;
+			var area_bound = 0;
+
+			if (!m_invalidated_rects.length)
+				return;
+
+			var rect_bound = new UI.Rect(m_invalidated_rects[0]);
+
+			for (var i = 0; i < m_invalidated_rects.length; i++) {
+
+				var c = m_invalidated_rects[i];
+
+				if (i != 0) {
+					rect_bound.left = Math.min(rect_bound.left, c.left);
+					rect_bound.top = Math.min(rect_bound.top, c.top);
+					rect_bound.right = Math.max(rect_bound.right, c.right);
+					rect_bound.bottom = Math.max(rect_bound.bottom, c.bottom);
+				}
+
+				area_sum += c.area();
+
+				// console.log('============');
+				// console.log(c.toString());
 			}
 
-			area_sum += c.area();
+			if (!area_sum) {
+				m_invalidated_rects = [];
+				return;
+			}
 
-			// console.log('============');
-			// console.log(c.toString());
-		}
+			var frame_rect = me.getRect();
 
-		if (!area_sum) {
-			m_invalidated_rects = [];
-			return;
-		}
+			var ctx = prepareCanvas();
 
-		var frame_rect = me.getRect();
-
-		var ctx = prepareCanvas();
-
-		ctx.save();
-		ctx.beginPath();
-		for (var i = 0; i < m_invalidated_rects.length; i++) {
-			var c = m_invalidated_rects[i];
-			ctx.rect(c.left, c.top, c.width(), c.height());
-		}
-		ctx.clip();
-		if (area_sum < rect_bound.area())
+			ctx.save();
+			ctx.beginPath();
 			for (var i = 0; i < m_invalidated_rects.length; i++) {
 				var c = m_invalidated_rects[i];
-				ctx.clearRect(c.left, c.top, c.width(), c.height());
-				me.paintUI(ctx, c);
+				ctx.rect(c.left, c.top, c.width(), c.height());
 			}
-		else {
-			ctx.clearRect(rect_bound.left, rect_bound.top, rect_bound.width(), rect_bound.height());
-			me.paintUI(ctx, rect_bound);
+			ctx.clip();
+			if (area_sum < rect_bound.area())
+				for (var i = 0; i < m_invalidated_rects.length; i++) {
+					var c = m_invalidated_rects[i];
+					ctx.clearRect(c.left, c.top, c.width(), c.height());
+					me.paintUI(ctx, c);
+				}
+			else {
+				ctx.clearRect(rect_bound.left, rect_bound.top, rect_bound.width(), rect_bound.height());
+				me.paintUI(ctx, rect_bound);
+			}
+			ctx.restore();
+
+			m_invalidated_rects = [];
+
+		});
+
+		function schedule_layout() {
+			
+			if (m_layout_scheduled) return;
+
+			m_layout_scheduled = true;
+
+			UI.XEventService.instance().postFrameEvent(
+				me.$THIS, 
+				{
+					'id' : SELF.EVENT_ID.EVENT_X_LAYOUT
+				});
 		}
-		ctx.restore();
 
-		m_invalidated_rects = [];
+		function onPageResize() {
+			schedule_layout();
+		}
 
+		function prepareCanvas() {
+			var frame_rect = me.getRect();
+
+			var frame_width = frame_rect.width();
+			var frame_height = frame_rect.height();
+
+			if (m_$window_canvas.prop('width') != frame_width)
+				m_$window_canvas.prop('width', frame_width);
+			if (m_$window_canvas.prop('height') != frame_height)
+				m_$window_canvas.prop('height', frame_height);
+
+			return m_$window_canvas[0].getContext('2d');
+		}
+
+	})
+	.$STATIC({
+		'Z_CANVAS_LAYER' : 100,
+		'buildFromXML' : buildFromXML,
 	});
 
-	function schedule_layout() {
-		
-		if (m_layout_scheduled) return;
+	$ENUM('UI.XWindow.EVENT_ID',
+	[
+		'EVENT_X_LAYOUT',
+		'EVENT_X_UPDATE',
+	]);	
 
-		m_layout_scheduled = true;
+	function buildFromXML(xml_node, parent) {
+		var container = parent;
 
-		UI.XEventService.instance().postFrameEvent(
-			me.$THIS, 
-			{
-				'id' : SELF.EVENT_ID.EVENT_X_LAYOUT
-			});
+		var layout_param = 
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var frame = new this();
+		frame.create(container, layout_param, 
+			UI.XFrame.Visibility.VISIBILITY_NONE);
+
+		return frame;
 	}
-
-	function onPageResize() {
-		schedule_layout();
-	}
-
-	function prepareCanvas() {
-		var frame_rect = me.getRect();
-
-		var frame_width = frame_rect.width();
-		var frame_height = frame_rect.height();
-
-		if (m_$window_canvas.prop('width') != frame_width)
-			m_$window_canvas.prop('width', frame_width);
-		if (m_$window_canvas.prop('height') != frame_height)
-			m_$window_canvas.prop('height', frame_height);
-
-		return m_$window_canvas[0].getContext('2d');
-	}
-
 })
-.$STATIC({
-	'Z_CANVAS_LAYER' : 100,
-});
+();
 
-$ENUM('UI.XWindow.EVENT_ID',
-[
-	'EVENT_X_LAYOUT',
-	'EVENT_X_UPDATE',
-]);
 
 ;
 
@@ -12849,7 +12954,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 		if (handled) {
 			e.preventDefault();
-			e.cancelBubble();
+			e.stopPropagation();
 		}
 	}
 
@@ -13060,7 +13165,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				return null;
 			}
 
-			frame_class.buildFromXML(xml_node, parent);
+			var frame = frame_class.buildFromXML(xml_node, parent);
 
 			frame.configFrameByXML(xml_node);
 
@@ -13074,6 +13179,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		'buildImage' : buildImage,
 		'buildImageList' : buildImageList,
 		'buildRect' : buildRect,
+		'buildText' : buildText,
 
 		'SPLIT_REGEXP' : /\|/,
 	});
@@ -13102,6 +13208,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		if (!type_name || !(type = xml_node.getAttribute(type_name)))
 			if (!image.isFormattedImage())
 				type = default_type || 'normal';
+		type = type || '';
 
 		switch(type.toLowerCase()) {
 			case 'normal' 	: image.setDrawType(UI.IXImage.DrawType.DIT_NORMAL); break;
@@ -13224,7 +13331,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		return rst;
 	}
 
-	function buildRect(xml_node, rect_prefix) {
+	function buildRect(xml_node, rect_prefix /* = null*/) {
 		var rect = new UI.Rect(0,0,0,0);
 		rect_prefix = rect_prefix || '';
 		rect.left =  xml_node.getAttribute(rect_prefix + 'left') - 0 || 0;
@@ -13234,6 +13341,57 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		rect.bottom = xml_node.getAttribute(rect_prefix + 'height') - 0 || 0;
 		rect.bottom += rect.top;
 		return rect;
+	}
+
+	function buildText(xml_node, text_prefix /* = null */) {
+		var text = new UI.XTextCanvasText();
+
+		text_prefix = text_prefix || '';
+		text.setText(xml_node.getAttribute(text_prefix + 'text') || '');
+
+		var font_face = 'Arial, \'Microsoft YaHei\'';
+		var font_size = 12;
+		var font_style = UI.XTextCanvasText.Style.STYLE_NORMAL;
+
+		var attr_name;
+
+		font_face = xml_node.getAttribute(text_prefix + 'font') || font_face;
+		
+		attr_name = text_prefix + 'font_size';
+		if (xml_node.hasAttribute(attr_name))
+			font_size = xml_node.getAttribute(attr_name) - 0 || 0;
+
+		var font_style_attr = xml_node.getAttribute(text_prefix + 'font_style') || '';
+		font_style_attr = font_style_attr.toLowerCase();
+		if (font_style_attr.indexOf('bold') != -1) font_style |= UI.XTextCanvasText.Style.STYLE_BOLD;
+		if (font_style_attr.indexOf('italic') != -1) font_style |= UI.XTextCanvasText.Style.STYLE_ITARIC;
+
+		text.setFont(font_face, font_size, font_style);
+
+		var align_h = UI.XTextCanvasText.Align.ALIGN_START;
+		var align_v = UI.XTextCanvasText.Align.ALIGN_START;
+
+		var align_h_attr = xml_node.getAttribute(text_prefix + 'text_align_h') || '';
+		var align_v_attr = xml_node.getAttribute(text_prefix + 'text_align_v') || '';
+		align_h_attr = align_h_attr.toLowerCase();
+		align_v_attr = align_v_attr.toLowerCase();
+
+		if (align_h_attr == 'center') align_h = UI.XTextCanvasText.Align.ALIGN_MIDDLE;
+		else if (align_h_attr == 'right') align_h = UI.XTextCanvasText.Align.ALIGN_END;
+
+		if (align_v_attr == 'middle') align_v = UI.XTextCanvasText.Align.ALIGN_MIDDLE;
+		else if (align_v_attr == 'bottom') align_v = UI.XTextCanvasText.Align.ALIGN_END;
+
+		text.setAlignment(align_h, align_v);
+
+		attr_name = text_prefix + 'text_color';
+		if (xml_node.hasAttribute(attr_name)) {
+			var color = xml_node.getAttribute(attr_name);
+			color = '#' + color;
+			text.setColor(color);
+		}
+
+		return text;
 	}
 
 })();
@@ -13261,7 +13419,7 @@ function(me){
 	});
 })
 .$STATIC({
-	'UNLIMITED' : -1
+	'UNLIMITED' : Number.POSITIVE_INFINITY
 });
 
 
@@ -13304,7 +13462,8 @@ function(me, SELF){
 		'setDstRect',
 
 		'getText',
-		'measure',
+		'measure', /* TODO: Optimize for high performance, by not creating objects
+		 			every time 'measure' is called. */
 
 		'setText',
 		'setFont',
@@ -13316,7 +13475,7 @@ function(me, SELF){
 	var m_dst_rect = new UI.Rect();
 	var m_text = '';
 	var m_face = 'Verdana, Arial, 微软雅黑, 宋体';
-	var m_size = 12;
+	var m_size = 13;
 	var m_style = SELF.Style.STYLE_NORMAL;
 	var m_color = '#000';
 	var m_halign = SELF.Align.ALIGN_START;
@@ -13359,8 +13518,9 @@ function(me, SELF){
 		return m_text;
 	});
 
-	$PUBLIC_FUN_IMPL('measure', function () {
-
+	$PUBLIC_FUN_IMPL('measure', function (width_limit) {
+		var canvas_text = build_canvas_text();
+		return canvas_text.measureText(m_text, width_limit);
 	});
 
 	$PUBLIC_FUN_IMPL('setText', function (text) {
@@ -13408,6 +13568,17 @@ function(me, SELF){
 		m_buffer.width = m_dst_rect.width();
 		m_buffer.height = m_dst_rect.height();
 
+		var canvas_text = build_canvas_text();
+
+		canvas_text.draw(m_buffer.getContext('2d'),
+			m_text, 
+			new UI.Rect(new UI.Pt(0, 0), new UI.Size(m_dst_rect.width(), m_dst_rect.height())),
+			convertAlignment(m_halign),
+			convertAlignment(m_valign)
+		);
+	}
+
+	function build_canvas_text () {
 		var canvas_text = new UI.XCanvasText();
 		canvas_text.setFontFace(m_face);
 		canvas_text.setFontSize(m_size);
@@ -13420,12 +13591,7 @@ function(me, SELF){
 			!!(m_style & SELF.Style.STYLE_ITARIC)
 		);
 
-		canvas_text.draw(m_buffer.getContext('2d'),
-			m_text, 
-			new UI.Rect(new UI.Pt(0, 0), new UI.Size(m_dst_rect.width(), m_dst_rect.height())),
-			convertAlignment(m_halign),
-			convertAlignment(m_valign)
-		);
+		return canvas_text;
 	}
 
 
@@ -13479,6 +13645,7 @@ function(me, SELF){
 
 		'draw',
 
+		'isImageLoaded',
 		'onImageLoaded',
 		'offImageLoaded'
 	]);
@@ -13613,6 +13780,10 @@ function(me, SELF){
 			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
 		ctx.restore();
 	});
+
+	$PUBLIC_FUN_IMPL('isImageLoaded', function(){
+		return m_loaded;
+	})
 
 	$PUBLIC_FUN_IMPL('onImageLoaded', function (fn) {
 		m_image_loaded_listener.push(fn);
@@ -13803,7 +13974,7 @@ function(me, SELF){
 
 		// X
 		for (var i = 0; i < img_real_width; i++)
-			if (getRGBA(data, i + 1, 0, m_img.getWidth()) == 0x000000FF) {
+			if (UI.ImageUtil.getImageDataRGBA(data, i + 1, 0, m_img.getWidth()) == 0x000000FF) {
 				m_part_rect.left = i;
 				break;
 			}
@@ -13812,7 +13983,7 @@ function(me, SELF){
 			m_part_rect.right = img_real_width;
 		} else {
 			for (i++; i < img_real_width; i++)
-				if (getRGBA(data, i + 1, 0, m_img.getWidth()) != 0x000000FF) {
+				if (UI.ImageUtil.getImageDataRGBA(data, i + 1, 0, m_img.getWidth()) != 0x000000FF) {
 					m_part_rect.right = i;
 					break;
 				}
@@ -13824,7 +13995,7 @@ function(me, SELF){
 		// Y
 		for (var j = 0; j < img_real_height; j++)
 		{
-			if (getRGBA(data, 0, j + 1, m_img.getWidth()) == 0x000000FF) {
+			if (UI.ImageUtil.getImageDataRGBA(data, 0, j + 1, m_img.getWidth()) == 0x000000FF) {
 				m_part_rect.top = j;
 				break;
 			}
@@ -13834,7 +14005,7 @@ function(me, SELF){
 			m_part_rect.bottom = img_real_height;
 		} else {
 			for (j++; j < img_real_height; j++)
-				if (getRGBA(data, 0, j + 1, m_img.getWidth()) != 0x000000FF) {
+				if (UI.ImageUtil.getImageDataRGBA(data, 0, j + 1, m_img.getWidth()) != 0x000000FF) {
 					m_part_rect.bottom = j;
 					break;
 				}
@@ -13849,18 +14020,6 @@ function(me, SELF){
 		m_src_rect.right = m_img.getWidth();
 		m_src_rect.bottom = m_img.getHeight();
 	}
-
-	function getRGBA(data, x, y, img_width)
-	{
-		var r,g,b,a;
-		var base = (y * img_width + x) * 4;
-		r = data[base], g = data[base + 1], b = data[base + 2], a = data[base + 3];
-		return r << 24 | g << 16 | b << 8 | a;
-	}
-
-
-
-	
 	
 
 })
@@ -13882,21 +14041,25 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		'setFontColor',
 
 		'setBold',
-		'setItalic'
+		'setItalic',
+
+		'measureText',
 	]);
 
+	var m_line_height_mutiplier = 1.2;
+
 	var m_font_face = 'Verdana, Arial, 微软雅黑, 宋体';
-	var m_font_size = 12;
+	var m_font_size = 13;
 	var m_font_color = '#000';
 
 	var m_bold = false;
 	var m_italic = false;
 
-	var m_line_height = 12 * 1.5;
+	var m_line_height = 13 * m_line_height_mutiplier;
 
-	var $body = $('BODY');
+	var m_measure_canvas = null;
 
-	$PUBLIC_FUN_IMPL('draw', function(ctx, string, rect, halign, valign) {
+	$PUBLIC_FUN_IMPL('draw', function(ctx, string_or_lines, rect, halign, valign) {
 
 		ctx.save();
 
@@ -13904,22 +14067,32 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		ctx.rect(rect.left, rect.top, rect.width(), rect.height());
 		ctx.clip();
 
-		var font = '';
-		if (m_italic) font += 'italic ';
-		if (m_bold) font += 'bold ';
-		font += m_font_size + 'px' + ' ';
-		font += m_font_face + ' ';
+		prepareCtxFont(ctx);		
 
-		ctx.font = font;
 		ctx.fillStyle = m_font_color;
 		ctx.textBaseline = 'top';
 
-		var lines = stringToLines(string, rect.width(), ctx);
+		var string, lines;
+
+		if (typeof string_or_lines == 'string') string = string_or_lines;
+		else lines = string_or_lines;
+
+		if (!lines)
+			lines = stringToLines(string, rect.width(), ctx);
+
+		// TODO: When centering texts vertically, canvas will put the texts a little higher, 
+		// so we'll handle vertically centering ourselves by detecting each pixel on the
+		// text that is rendered.
+		if (valign == SELF.Align.ALIGN_MIDDLE) {
+			handleCenterValignText(ctx, lines, rect, halign);
+			ctx.restore();
+			return;
+		}
+			
 
 		var y_start = getYStart(valign, lines.length, rect.height());
-		var y_current = y_start;
+		var y_current = y_start + (m_line_height - m_font_size) / 2;
 		for (var i = 0; i < lines.length; i++) {
-
 			var c = lines[i];
 			var x_current = getXStart(halign, c.width, rect.width());
 
@@ -13936,7 +14109,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	});
 	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
 		m_font_size = size - 0;
-		m_line_height = size * 1.5;
+		m_line_height = size * m_line_height_mutiplier;
 	});
 
 	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
@@ -14008,6 +14181,28 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		return lines;
 	}
 
+	$PUBLIC_FUN_IMPL('measureText', function(text, width_limit){
+		if (!m_measure_canvas)
+			m_measure_canvas = document.createElement('canvas');
+
+		var ctx = m_measure_canvas.getContext('2d');
+		ctx.save();
+		prepareCtxFont(ctx);
+
+		var lines = stringToLines(text, width_limit, ctx);
+
+		var max_x = 0, max_y = 0;
+
+		$.each(lines, function(i,v){
+			max_x = Math.max(max_x, v.width);
+		});
+		max_y = lines.length * m_line_height;
+
+		ctx.restore();
+
+		return new UI.Size(max_x, max_y);
+	});
+
 	function stringToWordArray(string) {
 		var rst = [];
 		var en_split = string.split(/\b/);
@@ -14018,9 +14213,59 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		return rst;
 	}
 
-	function measureText(string) {
+	function prepareCtxFont(ctx) {
+		var font = '';
+		if (m_italic) font += 'italic ';
+		if (m_bold) font += 'bold ';
+		font += m_font_size + 'px' + ' ';
+		font += m_font_face + ' ';
+		ctx.font = font;
 	}
 
+	function handleCenterValignText(ctx, lines, rect, halign){
+
+		var max_x = 0, max_y = 0;
+
+		max_x = rect.width();
+		max_y = Math.ceil(lines.length * m_line_height);
+
+		var temp_canvas = document.createElement('canvas');
+		temp_canvas.width = max_x;
+		temp_canvas.height = max_y;
+
+		var temp_ctx = temp_canvas.getContext('2d');
+		me.draw(temp_ctx, lines, new UI.Rect(0,0,max_x,max_y), halign, SELF.Align.ALIGN_START);
+
+		var data = temp_ctx.getImageData(0,0,max_x,max_y);
+		data = data.data;
+
+		var rect_bound = new UI.Rect(0,0,max_x,max_y);
+		var top_found = false, bottom_found = false;
+		for (var line = 0; line < max_y; line++) {
+			for (var col = 0; col < max_x; col++) {
+
+				if (!bottom_found && UI.ImageUtil.getImageDataRGBA(data, col, line, max_x) != 0x000000) {
+					bottom_found = true;
+					rect_bound.top += line;
+				}
+
+				if (!top_found && UI.ImageUtil.getImageDataRGBA(data, col, max_y - line - 1, max_x) != 0x000000) {
+					top_found = true;
+					rect_bound.bottom -= line;
+				}
+
+				if (top_found && bottom_found) break;
+			}
+
+			if (top_found && bottom_found) break;
+		}
+
+		ctx.drawImage(temp_canvas, rect.left, rect.top - rect_bound.top + Math.floor((rect.height() - rect_bound.height()) / 2));
+
+		console.log( rect.height() - rect_bound.height() );
+	}
+
+	
 });
 
 $ENUM('UI.XCanvasText.Align',
@@ -14119,3 +14364,326 @@ $CLASS('UI.XCanvasImage', function(me){
 	});
 
 });
+;
+
+(function() {
+
+	$CLASS('UI.XStatic', 
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'setRect',
+			'paintForeground',
+			
+			'onMeasureWidth',
+			'onMeasureHeight',
+
+			'setText',
+			'getText',
+		]);
+
+		var m_text = null;
+		var m_measured_height = 0;
+
+
+		$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/, 
+			text) {
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+			me.setText(text);
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			me.setText(null);
+			m_measured_height = -1;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('setRect', function(new_rect){
+			if (me.getRect().equals(new_rect)) return;
+			if (m_text)
+				m_text.setDstRect(new UI.Rect(0,0,new_rect.width(), new_rect.height()));
+			me.$PARENT(UI.XFrame).setRect(new_rect);
+		});
+
+		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect){
+			if (m_text) m_text.draw(ctx, rect);
+			me.$PARENT(UI.XFrame).paintForeground(ctx, rect);
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			me.$PARENT(UI.XFrame).onMeasureWidth(param);
+
+			if (!m_text) return;
+
+			var measured = me.getMeasuredWidth();
+			var text_metric;
+
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					text_metric = m_text.measure(param.num);
+				else
+					text_metric = m_text.measure(UI.IXText.UNLIMITED);
+
+				var new_measured = Math.max(measured, text_metric.w);
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					new_measured = Math.min(new_measured, param.num);
+
+				me.setMeasuredWidth(new_measured);
+
+			} else
+				text_metric = m_text.measure(measured);
+
+			m_measured_height = text_metric.h;
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			me.$PARENT(UI.XFrame).onMeasureHeight(param);
+
+			if (!m_text) return;
+
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
+				var measured = me.getMeasuredHeight();
+				var new_measured = Math.max(measured, m_measured_height);
+
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					new_measured = Math.min(param.num, new_measured);
+
+				me.setMeasuredHeight(new_measured);
+			}
+
+			m_measured_height = 0;
+
+		});
+
+		$PUBLIC_FUN_IMPL('setText', function(text){
+			
+			if (m_text == text) return null;
+
+			var old = m_text;
+			m_text = text;
+
+			if (m_text) {
+				var frame_rect = me.getRect();
+				m_text.setDstRect(new UI.Rect(0,0,frame_rect.width(), frame_rect.height()));
+			}
+
+			me.invalidateLayout();
+			me.invalidateAfterLayout();
+
+			return old;
+		});
+
+		$PUBLIC_FUN_IMPL('getText', function(){
+			if (!m_text) return '';
+			return m_text.getText();
+		});
+
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	function buildFromXML(xml_node, parent) {
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var text = UI.XFrameXMLFactory.buildText(xml_node);
+
+		var frame = new this();
+		frame.create(parent, layout_param, 
+			UI.XFrame.Visibility.VISIBILITY_NONE, text);
+
+		return frame;
+	}
+
+})();
+;
+
+$CLASS('UI.XButton', 
+$EXTENDS(UI.XFrame),
+function(me, SELF){
+
+	$PUBLIC_FUN([
+		'create',
+		'destroy',
+
+		'onBackgroundLoaded',
+		
+		'onMeasureWidth',
+		'onMeasureHeight',
+
+		'setBackground',
+	]);
+
+	$MESSAGE_MAP('EVENT', 
+	[
+		$MAP('mousedown', 'onMouseDown'),
+		$MAP('mouseup', 'onMouseUp'),
+		$MAP('mouseleave', 'onMouseLeave'),
+		$MAP('mouseenter', 'onMouseEnter'),
+	]);
+
+	var m_disabled = false;
+	var m_mouse_in = false;
+	var m_mouse_down = false;
+
+	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility /* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+		disabled /* = false */, background /* = null */) {
+
+		me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+
+		disabled = disabled || false;
+		m_disabled = disabled;
+
+		if (!background)
+			background = UI.XResourceMgr.getImage('img/ctrl/button.9.png');
+		me.setBackground(background);
+
+//		refreshButtonFace();
+	});
+
+	$PUBLIC_FUN_IMPL('setBackground', function(background){
+		var img = me.$PARENT(UI.XFrame).setBackground(background);
+
+		me.invalidateLayout();
+		refreshButtonFace();
+
+		return img;
+	});
+
+	$PUBLIC_FUN_IMPL('onBackgroundLoaded', function(){
+		// me.$PARENT(UI.XFrame).onBackgroundLoaded();
+		me.invalidateLayout();
+		refreshButtonFace();
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		m_disabled = false;
+		m_mouse_in = false;
+		m_mouse_down = false;
+		me.$PARENT(UI.XFrame).destroy();
+	});
+
+	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+		if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
+			param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
+			me.$PARENT(UI.XFrame).onMeasureWidth(param);
+			return;
+		}
+
+		var wrap_size = 0;
+		var background = me.getBackground();
+		if (background && background.isImageLoaded())
+			wrap_size = background.getImageWidth() / 4;
+
+		if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+			wrap_size = Math.min(wrap_size, param.num);
+
+		var wrap_measure_param = new SELF.MeasureParam();
+		wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+		wrap_measure_param.num = wrap_size;
+
+		me.$PARENT(UI.XFrame).onMeasureWidth(wrap_measure_param);
+
+	});
+
+	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+		if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
+			param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
+			me.$PARENT(UI.XFrame).onMeasureHeight(param);
+			return;
+		}
+
+		var wrap_size = 0;
+		var background = me.getBackground();
+		if (background && background.isImageLoaded())
+			wrap_size = background.getImageHeight();
+
+		if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+			wrap_size = Math.min(wrap_size, param.num);
+
+		var wrap_measure_param = new SELF.MeasureParam();
+		wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+		wrap_measure_param.num = wrap_size;
+
+		me.$PARENT(UI.XFrame).onMeasureHeight(wrap_measure_param);
+	});
+
+	$MESSAGE_HANDLER('onMouseDown', function(){
+
+		if (m_disabled) return true;
+
+		m_mouse_down = true;
+
+		refreshButtonFace();
+
+		me.getEventManager().captureMouse(me.$THIS);
+
+		return true;
+	});
+
+	$MESSAGE_HANDLER('onMouseUp', function(e){
+
+		if (!m_mouse_down) return true;
+		m_mouse_down = false;
+		me.getEventManager().releaseCaptureMouse(me.$THIS);
+
+		if (m_disabled) return true;
+
+		refreshButtonFace();
+
+		if (e.UI_pt.inRect(me.parentToChild(me.getRect())))
+			me.throwNotification(
+				{
+					'id' : SELF.EVENT_ID.EVENT_BUTTON_CLICKED,
+				});
+
+		return true;
+	});
+
+	$MESSAGE_HANDLER('onMouseLeave', function(){
+		m_mouse_in = false;
+		if (m_disabled) return;
+		refreshButtonFace();
+	});
+
+	$MESSAGE_HANDLER('onMouseEnter', function(){
+		m_mouse_in = true;
+		if (m_disabled) return;
+		refreshButtonFace();
+	});
+
+	function refreshButtonFace() {
+		var background = me.getBackground();
+		if (!background.isImageLoaded()) return;
+
+		var state = m_disabled ? 
+			SELF.BtnState.BTN_DISABLED : SELF.BtnState.BTN_NORMAL;
+
+		if (!m_disabled && m_mouse_in)
+			state = m_mouse_down ? SELF.BtnState.BTN_DOWN : SELF.BtnState.BTN_HOVER;
+
+		background.setSrcRect(new UI.Rect(
+			new UI.Pt(state * background.getImageWidth() / 4, 0),
+			new UI.Size(background.getImageWidth() / 4, background.getImageHeight())));
+
+		me.invalidateRect();
+	}
+
+});
+
+$ENUM('UI.XButton.BtnState', {
+	'BTN_NORMAL' 	: 0,
+	'BTN_HOVER'  	: 1,
+	'BTN_DOWN'	 	: 2,
+	'BTN_DISABLED' 	: 3,
+});
+
+$ENUM('UI.XButton.EVENT_ID', [
+	'EVENT_BUTTON_CLICKED',
+]);

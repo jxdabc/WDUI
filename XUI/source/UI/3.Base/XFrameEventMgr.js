@@ -138,7 +138,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 		if (handled) {
 			e.preventDefault();
-			e.cancelBubble();
+			e.stopPropagation();
 		}
 	}
 

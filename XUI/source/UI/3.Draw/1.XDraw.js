@@ -20,7 +20,7 @@ function(me){
 	});
 })
 .$STATIC({
-	'UNLIMITED' : -1
+	'UNLIMITED' : Number.POSITIVE_INFINITY
 });
 
 

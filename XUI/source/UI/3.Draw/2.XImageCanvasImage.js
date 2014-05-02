@@ -20,6 +20,7 @@ function(me, SELF){
 
 		'draw',
 
+		'isImageLoaded',
 		'onImageLoaded',
 		'offImageLoaded'
 	]);
@@ -154,6 +155,10 @@ function(me, SELF){
 			dst_to_draw_real.left, dst_to_draw_real.top, dst_to_draw_real.width(), dst_to_draw_real.height());
 		ctx.restore();
 	});
+
+	$PUBLIC_FUN_IMPL('isImageLoaded', function(){
+		return m_loaded;
+	})
 
 	$PUBLIC_FUN_IMPL('onImageLoaded', function (fn) {
 		m_image_loaded_listener.push(fn);
@@ -344,7 +349,7 @@ function(me, SELF){
 
 		// X
 		for (var i = 0; i < img_real_width; i++)
-			if (getRGBA(data, i + 1, 0, m_img.getWidth()) == 0x000000FF) {
+			if (UI.ImageUtil.getImageDataRGBA(data, i + 1, 0, m_img.getWidth()) == 0x000000FF) {
 				m_part_rect.left = i;
 				break;
 			}
@@ -353,7 +358,7 @@ function(me, SELF){
 			m_part_rect.right = img_real_width;
 		} else {
 			for (i++; i < img_real_width; i++)
-				if (getRGBA(data, i + 1, 0, m_img.getWidth()) != 0x000000FF) {
+				if (UI.ImageUtil.getImageDataRGBA(data, i + 1, 0, m_img.getWidth()) != 0x000000FF) {
 					m_part_rect.right = i;
 					break;
 				}
@@ -365,7 +370,7 @@ function(me, SELF){
 		// Y
 		for (var j = 0; j < img_real_height; j++)
 		{
-			if (getRGBA(data, 0, j + 1, m_img.getWidth()) == 0x000000FF) {
+			if (UI.ImageUtil.getImageDataRGBA(data, 0, j + 1, m_img.getWidth()) == 0x000000FF) {
 				m_part_rect.top = j;
 				break;
 			}
@@ -375,7 +380,7 @@ function(me, SELF){
 			m_part_rect.bottom = img_real_height;
 		} else {
 			for (j++; j < img_real_height; j++)
-				if (getRGBA(data, 0, j + 1, m_img.getWidth()) != 0x000000FF) {
+				if (UI.ImageUtil.getImageDataRGBA(data, 0, j + 1, m_img.getWidth()) != 0x000000FF) {
 					m_part_rect.bottom = j;
 					break;
 				}
@@ -390,18 +395,6 @@ function(me, SELF){
 		m_src_rect.right = m_img.getWidth();
 		m_src_rect.bottom = m_img.getHeight();
 	}
-
-	function getRGBA(data, x, y, img_width)
-	{
-		var r,g,b,a;
-		var base = (y * img_width + x) * 4;
-		r = data[base], g = data[base + 1], b = data[base + 2], a = data[base + 3];
-		return r << 24 | g << 16 | b << 8 | a;
-	}
-
-
-
-	
 	
 
 })

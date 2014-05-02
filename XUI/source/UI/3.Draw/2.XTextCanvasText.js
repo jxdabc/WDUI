@@ -11,7 +11,8 @@ function(me, SELF){
 		'setDstRect',
 
 		'getText',
-		'measure',
+		'measure', /* TODO: Optimize for high performance, by not creating objects
+		 			every time 'measure' is called. */
 
 		'setText',
 		'setFont',
@@ -23,7 +24,7 @@ function(me, SELF){
 	var m_dst_rect = new UI.Rect();
 	var m_text = '';
 	var m_face = 'Verdana, Arial, 微软雅黑, 宋体';
-	var m_size = 12;
+	var m_size = 13;
 	var m_style = SELF.Style.STYLE_NORMAL;
 	var m_color = '#000';
 	var m_halign = SELF.Align.ALIGN_START;
@@ -66,8 +67,9 @@ function(me, SELF){
 		return m_text;
 	});
 
-	$PUBLIC_FUN_IMPL('measure', function () {
-
+	$PUBLIC_FUN_IMPL('measure', function (width_limit) {
+		var canvas_text = build_canvas_text();
+		return canvas_text.measureText(m_text, width_limit);
 	});
 
 	$PUBLIC_FUN_IMPL('setText', function (text) {
@@ -115,6 +117,17 @@ function(me, SELF){
 		m_buffer.width = m_dst_rect.width();
 		m_buffer.height = m_dst_rect.height();
 
+		var canvas_text = build_canvas_text();
+
+		canvas_text.draw(m_buffer.getContext('2d'),
+			m_text, 
+			new UI.Rect(new UI.Pt(0, 0), new UI.Size(m_dst_rect.width(), m_dst_rect.height())),
+			convertAlignment(m_halign),
+			convertAlignment(m_valign)
+		);
+	}
+
+	function build_canvas_text () {
 		var canvas_text = new UI.XCanvasText();
 		canvas_text.setFontFace(m_face);
 		canvas_text.setFontSize(m_size);
@@ -127,12 +140,7 @@ function(me, SELF){
 			!!(m_style & SELF.Style.STYLE_ITARIC)
 		);
 
-		canvas_text.draw(m_buffer.getContext('2d'),
-			m_text, 
-			new UI.Rect(new UI.Pt(0, 0), new UI.Size(m_dst_rect.width(), m_dst_rect.height())),
-			convertAlignment(m_halign),
-			convertAlignment(m_valign)
-		);
+		return canvas_text;
 	}
 
 

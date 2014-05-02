@@ -12,7 +12,7 @@
   </XDock>
   <XSysControl type="edit" left="200" top="50" width="reach_parent" height="15" margin_right="20"></XSysControl>
   <XButton name="dialog_button" left="10" top="40" width="80" height="23">
-    <XStatic width="80" height="15" top="4" text_align_v="middle" text_align_h="center" font_style="bold" font="Times New Roman" text="DIALOG"></XStatic>
+    <XStatic width="80" height="23" top="0" text_align_v="middle" text_align_h="center" font_style="bold" font="Times New Roman" text="DIALOG"></XStatic>
   </XButton>
   <XScrollFrame top="70" left="150" width="reach_parent" height="100" h_scroll="true" v_scroll="true" margin_right="20">
     <XFrame bg="skin/headbg.png" bg_type="stretch" width="120" height="30"></XFrame>
