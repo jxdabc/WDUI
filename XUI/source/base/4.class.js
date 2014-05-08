@@ -1,5 +1,6 @@
 ;
 
+
 (function(global){
 
 	var object_info_stack = [];
@@ -29,14 +30,21 @@
 		factory.classname = name;
 		factory.parent_classes = [];
 
-		$.each(extend_list || [], function(i, parent) {
+		extend_list = extend_list || [];
+		for (var i = 0; i < extend_list.length; i++) {
+			var parent = extend_list[i];
+
+			if (parent.__struct__)
+				throw new Exception('XUIClass::CDS', 
+					'XUIClass: can not derive the struct class ' + parent.classname + '. ');
+
 			factory.parent_classes.push(parent);
-			$.each(parent, function(i,v) {
-				if (!parent.hasOwnProperty(i)) return;
-				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
-				makeReference(factory, i, parent, i);
-			});
-		});
+			for (var k in parent) {
+				if (!parent.hasOwnProperty(k)) continue;
+				if (static_inheritance_ignore_list.indexOf(k) != -1) continue;
+				makeReference(factory, k, parent, k);
+			}
+		}
 
 		factory.$STATIC = dealWithStatic;
 
@@ -73,7 +81,52 @@
 
 			this.$THIS = this;
 
+			profile_new_object(name);
+
 			return this;
+		}
+
+		return factory;
+	}
+
+	global.$STRUCT = function(name, scope) {
+
+		addClass(name, factory);
+
+		object_info_stack.push({});
+		scope(factory);
+		var object_info = object_info_stack.pop();
+		
+		factory.prototype = empty_obj_factory.prototype = {
+			'constructor' : null,
+			'classobj' : factory,
+			'instanceOf' : instanceOf,
+		}
+		memberInitialize(object_info, factory.prototype);
+
+		factory.classname = name;
+		factory.__struct__ = true;
+		factory.$STATIC = dealWithStatic;
+
+		var constructor_list = object_info.constructor_list || [];
+
+		function empty_obj_factory() {}
+		function factory() {
+			if (!this || !this.classobj)
+				return factory.apply(new empty_obj_factory(), arguments);
+
+			for (var i = 0; i < constructor_list.length; i++)
+				constructor_list[i].apply(this, arguments);
+
+			profile_new_object(name);
+
+			return this;
+		}
+
+		function instanceOf(cls) {
+			if (typeof cls != 'string')
+				cls = cls.classname;
+			return cls == name;
 		}
 
 		return factory;
@@ -94,10 +147,10 @@
 
 		if (list.constructor != global.Array) {
 			var fun_list = [];
-			$.each(list, function(i,v){
-				fun_list.push(i);
-				global.$PUBLIC_FUN_IMPL(i, v);
-			});
+			for (var k in list) {
+				fun_list.push(k);
+				global.$PUBLIC_FUN_IMPL(k, list[k]);
+			}
 			global.$PUBLIC_FUN(fun_list);
 
 			return;
@@ -156,27 +209,27 @@
 	}
 
 	global.$ENUM = function(classname, value_list) {
-		var classobj = $CLASS(classname, function(me){
+		var classobj = $STRUCT(classname, function(me){
 
 			$PUBLIC_VAR({
 				'name' : ''
 			});
 
 			$CONSTRUCTOR(function(name){
-				me.name = name;
+				this.name = name;
 			});
 		});
 
 		var global_list = {};
 
 		if (value_list.constructor == Array)
-			$.each(value_list, function(i,v){
+			for (var i = 0; i < value_list.length; i++) {
+				var v = value_list[i];
 				global_list[v] = new classobj(v);
-			});
+			}
 		else 
-			$.each(value_list, function(i,v){
-				global_list[i] = v;
-			});
+			for (var k in value_list)
+				global_list[k] = value_list[k];
 
 		classobj.$STATIC(global_list);
 	}
@@ -184,30 +237,32 @@
 	function buildParent(args, object_info, object, extend_list) {
 
 		var extend_list_with_args = {};
-		$.each(extend_list || [], function(i,v){
-			extend_list_with_args[v.classname] = [];
-		});
-		$.each(object_info.parent_constructor_list || [], function(i,v){
-			v.apply(global, 
-				[extend_list_with_args].concat(args));
-		});
+		extend_list = extend_list || [];
+		for (var i = 0; i < extend_list.length; i++)
+			extend_list_with_args[extend_list[i].classname] = [];
 
-		var parent_list =[];
+		object_info.parent_constructor_list = 
+			object_info.parent_constructor_list || [];
+		for (var i = 0; i < object_info.parent_constructor_list.length; i++)
+			object_info.parent_constructor_list[i].apply(global, [extend_list_with_args].concat(args));
 
-		$.each(extend_list || [], function(i,v){
+		var parent_list = [];
+
+		for (var i = 0; i < extend_list.length; i++) {
+			var v = extend_list[i];
 			var name = v.classname;
-			var parent = new v.empty_obj_factory();
+			var parent = v.apply(global, extend_list_with_args[name] || []);
 			parent_list.push({'name' : name, 'obj' : parent});
-			v.apply(parent, extend_list_with_args[name] || []);
-		});
+		}
 
-		$.each(parent_list, function(i,v){
+		for (var i = 0; i < parent_list.length; i++) {
+			var v = parent_list[i];
 			var parent = v.obj;
-			$.each(parent, function(i,v){
-				if (!parent.hasOwnProperty(i)) return;
-				makeReference(object, i, parent, i);
-			});
-		});
+			for (var k in parent) {
+				if (!parent.hasOwnProperty(k)) continue;
+				makeReference(object, k, parent, k);
+			}
+		}
 
 		Object.defineProperty(object, '$PARENT', {
 			enumerable : false,
@@ -220,18 +275,17 @@
 				if (typeof name != "string")
 					name = name.classname;
 
-				var direct_parent = null;
-				$.each(parent_list, function(i,v){
-					if (direct_parent) return;
-					if (v.name == name) direct_parent = v.obj;
-				});
-				if (direct_parent) return direct_parent;
-				var rst = null;
-				$.each(parent_list, function(i,v){
-					if (rst) return;
-					rst = v.obj.$PARENT(name);
-				});
-				return rst;
+				for (var i = 0; i < parent_list.length; i++) {
+					var v = parent_list[i];
+					if (v.name == name) return v.obj;
+				}
+
+				for (var i = 0; i < parent_list.length; i++) {
+					var rst = parent_list[i].obj.$PARENT(name);
+					if (rst) return rst;
+				}
+
+				return null;
 			}
 		});
 
@@ -239,47 +293,58 @@
 	}
 
 	function memberInitialize(object_info, object) {
-		$.each(object_info.public_var_list || [], function(i,v){
-			$.each(v, function(ii,vv){
-				makeProperty(object, ii, vv, true);
-			});
-		});
-		$.each(object_info.public_fun_list || [], function(i,v){
-			$.each(v, function(ii,vv){
+
+		object_info.public_var_list = 
+			object_info.public_var_list || [];
+		for (var i = 0; i < object_info.public_var_list.length; i++) {
+			var v = object_info.public_var_list[i];
+			for (var k in v)
+				makeProperty(object, k, v[k], true);
+		}
+
+		object_info.public_fun_list = 
+			object_info.public_fun_list || [];
+		for (var i = 0; i < object_info.public_fun_list.length; i++) {
+			var v = object_info.public_fun_list[i];
+			for (var j = 0; j < v.length; j++) {
+				var vv = v[j];
 				if (!object_info.public_fun_impl_map[vv])
 					throw new Exception('XUIClass::PFNI', 
 						'XUIClass: Public function ' + vv + ' not implemented. ');
 				makeProperty(object, vv, object_info.public_fun_impl_map[vv], false);
-			});
-		});
+			}
+		}
 	}
 
 	function addMessageHandingMechanism(object_info, object, parent_list) {
 		var maps = object_info.message_map;
 		var handlers = object_info.message_handlers;
 
-		$.each(maps || {}, function(i,v){
-			$.each(v, function(i,v){
-				if (v.chain) {
-					var parent_name = v.chain;
-					var parent = null;
-					$.each(parent_list, function(i,v){
-						if (parent) return;
-						if (v.name == parent_name)
-							parent = v.obj;
-					});
+		maps = maps || {};
 
+		for (var k in maps) {
+			var v = maps[k];
+			for (var i = 0; i < v.length; i++) {
+				var vv = v[i];
+				if (vv.chain) {
+					var parent_name = vv.chain;
+					var parent = null;
+					for (var j = 0; j < parent_list.length; j++) {
+						var vvv = parent_list[j];
+						if (vvv.name == parent_name) {
+							parent = vvv.obj;
+							break;
+						}
+					}
 					if (!parent)
 						throw new Exception('XUIClass::NDP', 
-							'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
-
-					v.chain = parent;
-				} 
-				else if (!handlers[v.handler])
+								'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
+					vv.chain = parent;
+				} else if (!handlers[vv.handler])
 					throw new 
-						Exception('XUIClass::MHND', 'XUIClass: Message handler ' + v.handler + ' not defined. ');
-			});
-		});
+							Exception('XUIClass::MHND', 'XUIClass: Message handler ' + vv.handler + ' not defined. ');
+			}
+		}
 
 		Object.defineProperty(object, '$DISPATCH_MESSAGE', {
 			enumerable : false,
@@ -289,18 +354,19 @@
 				var map = maps && maps[type];
 				var handled = false;
 				if (!map) {
-					$.each(parent_list, function(i,v) {
-						if (handled) return;
-						handled = v.obj.$DISPATCH_MESSAGE(type, msg);
-					});
+					for (var i = 0; i < parent_list.length; i++) {
+						handled = parent_list[i].obj.$DISPATCH_MESSAGE(type, msg);
+						if (handled) break;
+					}
 				} else {
-					$.each(map, function(i,v){
-						if (handled) return;
+					for (var i = 0; i < map.length; i++) {
+						var v = map[i];
 						if (v.chain)
 							handled = v.chain.$DISPATCH_MESSAGE(type, msg);
 						else if (v.id == msg.id)
 							handled = handlers[v.handler](msg);
-					});
+						if (handled) break;
+					}
 				}
 				return handled;
 			}
@@ -316,9 +382,8 @@
 			set: function (val) 
 			{
 				real_obj = val;
-				$.each(parent_list, function(i,v){
-					v.obj.$THIS = val;
-				});
+				for (var i = 0; i < parent_list.length; i++)
+					parent_list[i].obj.$THIS = val;
 			},
 			get: function () 
 			{
@@ -328,27 +393,28 @@
 	}
 
 	function buildProtectedThisReferenceObject(object, protected_this_reference) {
-		$.each(object, function(i,v){
-			if (!object.hasOwnProperty(i)) return;
-			if (typeof v != "function")
-				makeReference(protected_this_reference, i, object, i);
+
+		for (var k in object) {
+			if (!object.hasOwnProperty(k)) continue;
+			if (typeof object[k] != "function")
+				makeReference(protected_this_reference, k, object, k);
 			else
-			{
-				Object.defineProperty(protected_this_reference, i, 
-				{
-					enumerable : true,
-					configurable : true,
-					set: function (val) 
+				(function(k){
+					Object.defineProperty(protected_this_reference, k, 
 					{
-						protected_this_reference.$THIS[i] = val;
-					},
-					get: function () 
-					{
-						return protected_this_reference.$THIS[i];
-					}
-				});
-			}
-		});
+						enumerable : true,
+						configurable : true,
+						set: function (val) 
+						{
+							protected_this_reference.$THIS[k] = val;
+						},
+						get: function () 
+						{
+							return protected_this_reference.$THIS[k];
+						}
+					});
+				})(k);
+		}
 
 		makeReference(protected_this_reference, '$THIS', object, '$THIS');
 		makeReference(protected_this_reference, '$PARENT', object, '$PARENT');
@@ -358,18 +424,20 @@
 	}
 
 	function construct(object_info, args) {
-		$.each(object_info.constructor_list || [], function(i,v){
-			v.apply(global, args);
-		});
+
+		object_info.constructor_list =
+			object_info.constructor_list || [];
+
+		for (var i = 0; i < object_info.constructor_list.length; i++)
+			object_info.constructor_list[i].apply(global, args);
 	}
 
 
 	function dealWithStatic(list) {
-		var me = this;
-		$.each(list, function(i,v){
-			makeProperty(me, i, v, 
-				typeof v != "function");
-		});
+		for (var k in list) {
+			var v = list[k];
+			makeProperty(this, k, v, typeof v != 'function');
+		}
 	}
 
 	
@@ -413,6 +481,13 @@
 			writable : writable,
 			value : value
 		});
+	}
+
+	function profile_new_object(name) {
+		var hash = global.$OBJPROFILE = global.$OBJPROFILE || {};
+		if (!(name in hash))
+			hash[name] = 0;
+		hash[name]++;
 	}
 
 })(window);

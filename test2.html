@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+<script type="text/javascript" src="XUI/release/XUI.js"></script>
+
+<div id="test_div" style="width:80%;height:1000px; border:1px solid red;margin-bottom:20px;">
+</div>
+
+<script type="text/javascript">
+
+	$CLASS('TEST', function(me){});
+
+	// xml test. 
+	(function(){
+
+		$.get('UI.xml')
+			.done(function(xml){
+				var win = UI.XFrameXMLFactory.instance().buildFrame(xml.documentElement, $('#test_div')[0]);
+				
+
+				var sys_max_button = win.getFrameByName('sys_max');
+				var sys_max_button_face = 0;
+				var win_width = 800;
+				var win_height = 600;
+				sys_max_button.addNotificationListener(new UI.EasyNotificationListener(function(n){
+					if (n.id != UI.XButton.NOTIFICATION.NOTIFICATION_BUTTON_CLICKED)
+						return;
+
+					sys_max_button_face = 1 - sys_max_button_face;
+					if (win_width == 800)
+						win_width = UI.XFrame.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+					else
+						win_width = 800;
+
+					if (win_height == 600)
+						win_height = UI.XFrame.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+					else
+						win_height = 600;
+
+					var layout = win.beginUpdateLayoutParam();
+					layout.width = win_width;
+					layout.height = win_height;
+					win.endUpdateLayoutParam();
+
+					
+					n.src.changeButtonFaceTo(sys_max_button_face);
+				}));
+
+			});
+	})
+	()
+	;
+
+</script>

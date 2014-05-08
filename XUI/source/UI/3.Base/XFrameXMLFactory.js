@@ -20,7 +20,8 @@
 
 			var frame = frame_class.buildFromXML(xml_node, parent);
 
-			frame.configFrameByXML(xml_node);
+			if (frame)
+				frame.configFrameByXML(xml_node);
 
 			return frame;
 		});
@@ -113,7 +114,7 @@
 		type_list_name /* = null*/, default_type /* = null*/, part_rect_list_prefix /* = null*/) {
 
 		var path_list = xml_node.getAttribute(path_list_name);
-		if (!path_list) return;
+		if (!path_list) return [];
 		path_list = path_list.split(this.SPLIT_REGEXP);
 
 		var attr;
@@ -124,17 +125,19 @@
 
 		var part_left_list = [], part_top_list = [], 
 			part_width_list = [], part_height_list = [];
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'left')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'left')))
 			part_left_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'top')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'top')))
 			part_top_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'width')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'width')))
 			part_width_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'height')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'height')))
 			part_height_list = attr.split(this.SPLIT_REGEXP);
 
 		var rst = [];
 		for (var i = 0; i < path_list.length; i++) {
+			var c = path_list[i];
+
 			var image = new UI.XImageCanvasImage();
 			image.load(c);
 

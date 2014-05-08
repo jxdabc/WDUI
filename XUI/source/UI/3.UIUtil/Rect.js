@@ -1,12 +1,14 @@
 ;
 
-$CLASS('UI.Rect', function(me){
+
+$STRUCT('UI.Rect', function(SELF){
 
 	$PUBLIC_FUN([
 		'width',
 		'height',
 		'leftTop',
 		'rightBottom',
+		'size',
 		'area',
 		'isEmpty',
 
@@ -16,7 +18,7 @@ $CLASS('UI.Rect', function(me){
 
 		'offset',
 
-		'toString'
+		'toString',
 	]);
 
 	$PUBLIC_VAR({
@@ -33,28 +35,26 @@ $CLASS('UI.Rect', function(me){
 		//			function(left_top, right_bottom)
 		//			function(rect)
 
-
-
 		if (typeof left == "undefined")
 			return;
 
 		if (left.instanceOf && left.instanceOf(UI.Pt))
 		{
 			var left_top = left;
-			me.left = left_top.x;
-			me.top = left_top.y;
+			this.left = left_top.x;
+			this.top = left_top.y;
 
 			if (top.instanceOf && top.instanceOf(UI.Size)) {
 				var size = top;
-				me.right = me.left + size.w;
-				me.bottom = me.top + size.h;
+				this.right = this.left + size.w;
+				this.bottom = this.top + size.h;
 				return;
 			}
 			
 			if (top.instanceOf && top.instanceOf(UI.Pt)) {
 				var right_bottom = top;
-				me.right = right_bottom.x;
-				me.bottom = right_bottom.y;
+				this.right = right_bottom.x;
+				this.bottom = right_bottom.y;
 				return;
 			}
 			
@@ -64,56 +64,60 @@ $CLASS('UI.Rect', function(me){
 		if (left.instanceOf && left.instanceOf(UI.Rect))
 		{
 			var rc = left;
-			me.left = rc.left;
-			me.top = rc.top;
-			me.right = rc.right;
-			me.bottom = rc.bottom;
+			this.left = rc.left;
+			this.top = rc.top;
+			this.right = rc.right;
+			this.bottom = rc.bottom;
 
 			return;
 		}
 
-		me.left = left;
-		me.top = top;
-		me.right = right;
-		me.bottom = bottom;
+		this.left = left;
+		this.top = top;
+		this.right = right;
+		this.bottom = bottom;	
 	});
 
-	$PUBLIC_FUN_IMPL('width', function  () { return me.right - me.left; });
-	$PUBLIC_FUN_IMPL('height',function  () { return me.bottom - me.top; } );
+	$PUBLIC_FUN_IMPL('width', function  () { return this.right - this.left; });
+	$PUBLIC_FUN_IMPL('height',function  () { return this.bottom - this.top; } );
 	
 	$PUBLIC_FUN_IMPL('leftTop', function () {
-		return new UI.Pt(me.left, me.top);
+		return new UI.Pt(this.left, this.top);
 	});
 
 	$PUBLIC_FUN_IMPL('rightBottom', function () {
-		return new UI.Pt(me.right, me.bottom);
+		return new UI.Pt(this.right, this.bottom);
 	});
 
 	$PUBLIC_FUN_IMPL('area', function  () {
-		return (me.bottom - me.top) * (me.right - me.left);
+		return (this.bottom - this.top) * (this.right - this.left);
 	});
 
+	$PUBLIC_FUN_IMPL('size', function () {
+		return new UI.Size(this.width(), this.height());
+	})
+
 	$PUBLIC_FUN_IMPL('isEmpty', function () {
-		return me.bottom <= me.top || me.right <= me.left;
+		return this.bottom <= this.top || this.right <= this.left;
 	});
 
 	$PUBLIC_FUN_IMPL('equals', function (rc) {
-		return me.top == rc.top &&
-			me.bottom == rc.bottom &&
-			me.left == rc.left &&
-			me.right == rc.right;
+		return this.top == rc.top &&
+			this.bottom == rc.bottom &&
+			this.left == rc.left &&
+			this.right == rc.right;
 	});
 
 	$PUBLIC_FUN_IMPL('intersect', function (rc) {
 		var new_rect = new UI.Rect();
 		do 
 		{
-			new_rect.top = Math.max(me.top, rc.top);
-			new_rect.bottom = Math.min(me.bottom, rc.bottom);
+			new_rect.top = Math.max(this.top, rc.top);
+			new_rect.bottom = Math.min(this.bottom, rc.bottom);
 			if (new_rect.top > new_rect.bottom) break;
 
-			new_rect.left = Math.max(me.left, rc.left);
-			new_rect.right = Math.min(me.right, rc.right);
+			new_rect.left = Math.max(this.left, rc.left);
+			new_rect.right = Math.min(this.right, rc.right);
 			if (new_rect.left > new_rect.right) break;
 
 			return new_rect;
@@ -131,14 +135,14 @@ $CLASS('UI.Rect', function(me){
 			y = pt.y;
 		}
 
-		me.left += x;
-		me.top += y;
-		me.right += x;
-		me.bottom += y;
+		this.left += x;
+		this.top += y;
+		this.right += x;
+		this.bottom += y;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function () {
 		return "left:%, top:%, right:%, bottom:%"
-			.format(me.left, me.top, me.right, me.bottom);
+			.format(this.left, this.top, this.right, this.bottom);
 	});
 });

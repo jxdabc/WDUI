@@ -19,9 +19,40 @@
 
 	// xml test. 
 	(function(){
+
 		$.get('UI.xml')
 			.done(function(xml){
-				var frame = UI.XFrameXMLFactory.instance().buildFrame(xml.documentElement, $('#test_div2')[0]);
+				var win = UI.XFrameXMLFactory.instance().buildFrame(xml.documentElement, $('#test_div2')[0]);
+				
+
+				var sys_max_button = win.getFrameByName('sys_max');
+				var sys_max_button_face = 0;
+				var win_width = 800;
+				var win_height = 600;
+				sys_max_button.addNotificationListener(new UI.EasyNotificationListener(function(n){
+					if (n.id != UI.XButton.NOTIFICATION.NOTIFICATION_BUTTON_CLICKED)
+						return;
+
+					sys_max_button_face = 1 - sys_max_button_face;
+					if (win_width == 800)
+						win_width = UI.XFrame.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+					else
+						win_width = 800;
+
+					if (win_height == 600)
+						win_height = UI.XFrame.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT;
+					else
+						win_height = 600;
+
+					var layout = win.beginUpdateLayoutParam();
+					layout.width = win_width;
+					layout.height = win_height;
+					win.endUpdateLayoutParam();
+
+					
+					n.src.changeButtonFaceTo(sys_max_button_face);
+				}));
+
 			});
 	})
 	()
@@ -96,6 +127,36 @@
 		img.setDrawType(UI.XImageCanvasImage.DrawType.DIT_STRETCH);
 		innerinner.setBackground(img);
 
+		var scroll_bar_v = new UI.XScrollBar();
+		var layout = win.generateLayoutParam();
+		layout.x = 10;
+		layout.y = 80;
+		layout.width = 15;
+		layout.height = 300;
+		scroll_bar_v.create(win, UI.XScrollBar.ScrollType.SCROLL_V, layout);
+		scroll_bar_v.setName('scroll_v');
+		scroll_bar_v.setVisibility(UI.XScrollBar.Visibility.VISIBILITY_SHOW);
+
+		scroll_bar_v.setContentLen(1000);
+		scroll_bar_v.setViewLen(300);
+		scroll_bar_v.setScrollPos(500);
+
+
+		var scroll_bar_h = new UI.XScrollBar();
+		var layout = win.generateLayoutParam();
+		layout.x = 10;
+		layout.y = 380;
+		layout.width = 100;
+		layout.height = 15;
+		scroll_bar_h.create(win, UI.XScrollBar.ScrollType.SCROLL_H, layout);
+		scroll_bar_h.setName('scroll_h');
+		scroll_bar_h.setVisibility(UI.XScrollBar.Visibility.VISIBILITY_SHOW);
+
+		scroll_bar_h.setContentLen(1000);
+		scroll_bar_h.setViewLen(600);
+		scroll_bar_h.setScrollPos(500);
+
+
 
 		var i = 0;
 		setInterval(function(){
@@ -124,7 +185,9 @@
 
 
 		}, 3000);
-	})();
+	})
+//	()
+	;
 
 	// message test
 	(function(){
@@ -512,7 +575,7 @@
 		img.setDstRect(new UI.Rect(50,50,750,750));
 
 	})
-	()
+//	()
 	;
 
 

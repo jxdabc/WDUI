@@ -44,6 +44,7 @@ function(me, SELF){
 	var m_loaded = false;
 	var m_image_loaded_listener = [];
 
+	var m_formatted_img = false;
 
 	$PUBLIC_FUN_IMPL('load', function (path) {
 
@@ -51,6 +52,13 @@ function(me, SELF){
 		m_unloaded_part_rect = 
 		m_unloaded_draw_type =
 		null;
+
+		var filename = getFileNameFromPath(path);
+		filename = filename.toLowerCase();
+		m_formatted_img = 
+			filename.indexOf('.normal.') != -1 ||
+			filename.indexOf('.stretch.') != -1 ||
+			filename.indexOf('.9.') != -1;
 
 		if (path.substr(0, 1) == '@')
 			loadAsResource(path.substr(1));
@@ -127,9 +135,7 @@ function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('isFormattedImage', function(){
-		return m_img.src.indexOf('.normal.') != -1 ||
-			m_img.src.indexOf('.stretch.') != -1 ||
-			m_img.src.indexOf('.9.') != -1;
+		return m_formatted_img;
 	});
 
 	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
@@ -244,6 +250,7 @@ function(me, SELF){
 			case SELF.DrawType.DIT_3PARTV: 
 				draw3PartV(m_buffer.getContext('2d')); 
 				break;
+			// TODO : draw center. 
 		}
 	}
 
@@ -253,13 +260,14 @@ function(me, SELF){
 		var height = m_src_rect.height();
 
 		m_img.draw(ctx, 
-		new UI.Rect(m_src_rect.left, m_src_rect.top, width, height),
+		new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), new UI.Size(width, height)),
 		new UI.Rect(0, 0, width, height));
 	}
 
 	function drawStretch(ctx) {
 		m_img.draw(ctx, 
-		new UI.Rect(m_src_rect.left, m_src_rect.top, m_src_rect.width(), m_src_rect.height()),
+		new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), 
+			new UI.Size(m_src_rect.width(), m_src_rect.height())),
 		new UI.Rect(0, 0, m_dst_rect.width(), m_dst_rect.height()));
 	}
 
@@ -328,11 +336,13 @@ function(me, SELF){
 
 
 	function loadFormattedImageInfo() {
-		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
+		var filename = getFileNameFromPath(m_img.src);
+		filename = filename.toLowerCase();
+		if (filename.indexOf('.normal.') != -1)
 			m_draw_type = SELF.DrawType.DIT_NORMAL;
-		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
+		else if (filename.indexOf('.stretch.') != -1)
 			m_draw_type = SELF.DrawType.DIT_STRETCH;
-		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
+		else if (filename.indexOf('.9.') != -1) {
 			m_draw_type = SELF.DrawType.DIT_9PART;
 			if (!m_unloaded_part_rect) loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
@@ -395,7 +405,10 @@ function(me, SELF){
 		m_src_rect.right = m_img.getWidth();
 		m_src_rect.bottom = m_img.getHeight();
 	}
-	
+
+	function getFileNameFromPath(path) {
+		return path.substring(path.lastIndexOf('/') + 1);
+	}
 
 })
 .$STATIC({

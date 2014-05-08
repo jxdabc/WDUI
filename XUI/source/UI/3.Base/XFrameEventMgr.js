@@ -19,6 +19,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	var m_focus_raw_event = {type : 'focus'};
 	var m_blur_raw_event = {type : 'blur'};
 
+	var m_mouse_wheel_pixel_unit = 33.3333;
+
 	$CONSTRUCTOR(function(root_frame, $position_canvas){
 		m_root_frame = root_frame;
 		m_$position_canvas = $position_canvas;
@@ -97,7 +99,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				{'event' : 'mouseup', 'handle' : false},
 				{'event' : 'dblclick', 'handle' : false},
 				{'event' : 'mousemove', 'handle' : false},
-				{'event' : 'mousewheel', 'handle' : false},
+				{'event' : 'wheel', 'handle' : false},
 				{'event' : 'keydown', 'handle' : false},
 				{'event' : 'keyup', 'handle' : false},
 			];
@@ -106,6 +108,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	}
 
 	function onEvent(e) {
+
+
 
 		var offset_frame = m_$position_canvas.offset();
 		if (typeof e.pageX != 'undefined' &&
@@ -211,6 +215,21 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				msg4frame.UI_pt = 
 					target.otherFrameToThisFrame(m_root_frame, msg4frame.UI_pt);
 				break;
+
+			case 'wheel':
+				var delta = msg4frame.UI_delta = e.originalEvent.deltaY;
+				switch (e.originalEvent.deltaMode) {
+					// pixel
+					case 0: 
+						msg4frame.UI_delta = Math.round(delta / m_mouse_wheel_pixel_unit);
+						break;
+					// line
+					case 1: 
+						break;
+					// page
+					case 2:
+						msg4frame.UI_delta = Math.round(Math.abs(delta) / delta);
+				}
 
 			default:
 				break;

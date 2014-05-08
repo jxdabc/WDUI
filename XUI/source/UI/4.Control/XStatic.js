@@ -130,7 +130,7 @@
 
 		var frame = new this();
 		frame.create(parent, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE, text);
+			this.Visibility.VISIBILITY_NONE, text);
 
 		return frame;
 	}

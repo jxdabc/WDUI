@@ -10367,6 +10367,7 @@ String.prototype.upperFirst = function()
 }
 ;
 
+
 (function(global){
 
 	var object_info_stack = [];
@@ -10396,14 +10397,21 @@ String.prototype.upperFirst = function()
 		factory.classname = name;
 		factory.parent_classes = [];
 
-		$.each(extend_list || [], function(i, parent) {
+		extend_list = extend_list || [];
+		for (var i = 0; i < extend_list.length; i++) {
+			var parent = extend_list[i];
+
+			if (parent.__struct__)
+				throw new Exception('XUIClass::CDS', 
+					'XUIClass: can not derive the struct class ' + parent.classname + '. ');
+
 			factory.parent_classes.push(parent);
-			$.each(parent, function(i,v) {
-				if (!parent.hasOwnProperty(i)) return;
-				if (static_inheritance_ignore_list.indexOf(i) != -1) return;
-				makeReference(factory, i, parent, i);
-			});
-		});
+			for (var k in parent) {
+				if (!parent.hasOwnProperty(k)) continue;
+				if (static_inheritance_ignore_list.indexOf(k) != -1) continue;
+				makeReference(factory, k, parent, k);
+			}
+		}
 
 		factory.$STATIC = dealWithStatic;
 
@@ -10440,7 +10448,52 @@ String.prototype.upperFirst = function()
 
 			this.$THIS = this;
 
+			profile_new_object(name);
+
 			return this;
+		}
+
+		return factory;
+	}
+
+	global.$STRUCT = function(name, scope) {
+
+		addClass(name, factory);
+
+		object_info_stack.push({});
+		scope(factory);
+		var object_info = object_info_stack.pop();
+		
+		factory.prototype = empty_obj_factory.prototype = {
+			'constructor' : null,
+			'classobj' : factory,
+			'instanceOf' : instanceOf,
+		}
+		memberInitialize(object_info, factory.prototype);
+
+		factory.classname = name;
+		factory.__struct__ = true;
+		factory.$STATIC = dealWithStatic;
+
+		var constructor_list = object_info.constructor_list || [];
+
+		function empty_obj_factory() {}
+		function factory() {
+			if (!this || !this.classobj)
+				return factory.apply(new empty_obj_factory(), arguments);
+
+			for (var i = 0; i < constructor_list.length; i++)
+				constructor_list[i].apply(this, arguments);
+
+			profile_new_object(name);
+
+			return this;
+		}
+
+		function instanceOf(cls) {
+			if (typeof cls != 'string')
+				cls = cls.classname;
+			return cls == name;
 		}
 
 		return factory;
@@ -10461,10 +10514,10 @@ String.prototype.upperFirst = function()
 
 		if (list.constructor != global.Array) {
 			var fun_list = [];
-			$.each(list, function(i,v){
-				fun_list.push(i);
-				global.$PUBLIC_FUN_IMPL(i, v);
-			});
+			for (var k in list) {
+				fun_list.push(k);
+				global.$PUBLIC_FUN_IMPL(k, list[k]);
+			}
 			global.$PUBLIC_FUN(fun_list);
 
 			return;
@@ -10523,27 +10576,27 @@ String.prototype.upperFirst = function()
 	}
 
 	global.$ENUM = function(classname, value_list) {
-		var classobj = $CLASS(classname, function(me){
+		var classobj = $STRUCT(classname, function(me){
 
 			$PUBLIC_VAR({
 				'name' : ''
 			});
 
 			$CONSTRUCTOR(function(name){
-				me.name = name;
+				this.name = name;
 			});
 		});
 
 		var global_list = {};
 
 		if (value_list.constructor == Array)
-			$.each(value_list, function(i,v){
+			for (var i = 0; i < value_list.length; i++) {
+				var v = value_list[i];
 				global_list[v] = new classobj(v);
-			});
+			}
 		else 
-			$.each(value_list, function(i,v){
-				global_list[i] = v;
-			});
+			for (var k in value_list)
+				global_list[k] = value_list[k];
 
 		classobj.$STATIC(global_list);
 	}
@@ -10551,30 +10604,32 @@ String.prototype.upperFirst = function()
 	function buildParent(args, object_info, object, extend_list) {
 
 		var extend_list_with_args = {};
-		$.each(extend_list || [], function(i,v){
-			extend_list_with_args[v.classname] = [];
-		});
-		$.each(object_info.parent_constructor_list || [], function(i,v){
-			v.apply(global, 
-				[extend_list_with_args].concat(args));
-		});
+		extend_list = extend_list || [];
+		for (var i = 0; i < extend_list.length; i++)
+			extend_list_with_args[extend_list[i].classname] = [];
 
-		var parent_list =[];
+		object_info.parent_constructor_list = 
+			object_info.parent_constructor_list || [];
+		for (var i = 0; i < object_info.parent_constructor_list.length; i++)
+			object_info.parent_constructor_list[i].apply(global, [extend_list_with_args].concat(args));
 
-		$.each(extend_list || [], function(i,v){
+		var parent_list = [];
+
+		for (var i = 0; i < extend_list.length; i++) {
+			var v = extend_list[i];
 			var name = v.classname;
-			var parent = new v.empty_obj_factory();
+			var parent = v.apply(global, extend_list_with_args[name] || []);
 			parent_list.push({'name' : name, 'obj' : parent});
-			v.apply(parent, extend_list_with_args[name] || []);
-		});
+		}
 
-		$.each(parent_list, function(i,v){
+		for (var i = 0; i < parent_list.length; i++) {
+			var v = parent_list[i];
 			var parent = v.obj;
-			$.each(parent, function(i,v){
-				if (!parent.hasOwnProperty(i)) return;
-				makeReference(object, i, parent, i);
-			});
-		});
+			for (var k in parent) {
+				if (!parent.hasOwnProperty(k)) continue;
+				makeReference(object, k, parent, k);
+			}
+		}
 
 		Object.defineProperty(object, '$PARENT', {
 			enumerable : false,
@@ -10587,18 +10642,17 @@ String.prototype.upperFirst = function()
 				if (typeof name != "string")
 					name = name.classname;
 
-				var direct_parent = null;
-				$.each(parent_list, function(i,v){
-					if (direct_parent) return;
-					if (v.name == name) direct_parent = v.obj;
-				});
-				if (direct_parent) return direct_parent;
-				var rst = null;
-				$.each(parent_list, function(i,v){
-					if (rst) return;
-					rst = v.obj.$PARENT(name);
-				});
-				return rst;
+				for (var i = 0; i < parent_list.length; i++) {
+					var v = parent_list[i];
+					if (v.name == name) return v.obj;
+				}
+
+				for (var i = 0; i < parent_list.length; i++) {
+					var rst = parent_list[i].obj.$PARENT(name);
+					if (rst) return rst;
+				}
+
+				return null;
 			}
 		});
 
@@ -10606,47 +10660,58 @@ String.prototype.upperFirst = function()
 	}
 
 	function memberInitialize(object_info, object) {
-		$.each(object_info.public_var_list || [], function(i,v){
-			$.each(v, function(ii,vv){
-				makeProperty(object, ii, vv, true);
-			});
-		});
-		$.each(object_info.public_fun_list || [], function(i,v){
-			$.each(v, function(ii,vv){
+
+		object_info.public_var_list = 
+			object_info.public_var_list || [];
+		for (var i = 0; i < object_info.public_var_list.length; i++) {
+			var v = object_info.public_var_list[i];
+			for (var k in v)
+				makeProperty(object, k, v[k], true);
+		}
+
+		object_info.public_fun_list = 
+			object_info.public_fun_list || [];
+		for (var i = 0; i < object_info.public_fun_list.length; i++) {
+			var v = object_info.public_fun_list[i];
+			for (var j = 0; j < v.length; j++) {
+				var vv = v[j];
 				if (!object_info.public_fun_impl_map[vv])
 					throw new Exception('XUIClass::PFNI', 
 						'XUIClass: Public function ' + vv + ' not implemented. ');
 				makeProperty(object, vv, object_info.public_fun_impl_map[vv], false);
-			});
-		});
+			}
+		}
 	}
 
 	function addMessageHandingMechanism(object_info, object, parent_list) {
 		var maps = object_info.message_map;
 		var handlers = object_info.message_handlers;
 
-		$.each(maps || {}, function(i,v){
-			$.each(v, function(i,v){
-				if (v.chain) {
-					var parent_name = v.chain;
-					var parent = null;
-					$.each(parent_list, function(i,v){
-						if (parent) return;
-						if (v.name == parent_name)
-							parent = v.obj;
-					});
+		maps = maps || {};
 
+		for (var k in maps) {
+			var v = maps[k];
+			for (var i = 0; i < v.length; i++) {
+				var vv = v[i];
+				if (vv.chain) {
+					var parent_name = vv.chain;
+					var parent = null;
+					for (var j = 0; j < parent_list.length; j++) {
+						var vvv = parent_list[j];
+						if (vvv.name == parent_name) {
+							parent = vvv.obj;
+							break;
+						}
+					}
 					if (!parent)
 						throw new Exception('XUIClass::NDP', 
-							'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
-
-					v.chain = parent;
-				} 
-				else if (!handlers[v.handler])
+								'XUIClass: ' + parent_name + ' not a direct parent of this class. ');
+					vv.chain = parent;
+				} else if (!handlers[vv.handler])
 					throw new 
-						Exception('XUIClass::MHND', 'XUIClass: Message handler ' + v.handler + ' not defined. ');
-			});
-		});
+							Exception('XUIClass::MHND', 'XUIClass: Message handler ' + vv.handler + ' not defined. ');
+			}
+		}
 
 		Object.defineProperty(object, '$DISPATCH_MESSAGE', {
 			enumerable : false,
@@ -10656,18 +10721,19 @@ String.prototype.upperFirst = function()
 				var map = maps && maps[type];
 				var handled = false;
 				if (!map) {
-					$.each(parent_list, function(i,v) {
-						if (handled) return;
-						handled = v.obj.$DISPATCH_MESSAGE(type, msg);
-					});
+					for (var i = 0; i < parent_list.length; i++) {
+						handled = parent_list[i].obj.$DISPATCH_MESSAGE(type, msg);
+						if (handled) break;
+					}
 				} else {
-					$.each(map, function(i,v){
-						if (handled) return;
+					for (var i = 0; i < map.length; i++) {
+						var v = map[i];
 						if (v.chain)
 							handled = v.chain.$DISPATCH_MESSAGE(type, msg);
 						else if (v.id == msg.id)
 							handled = handlers[v.handler](msg);
-					});
+						if (handled) break;
+					}
 				}
 				return handled;
 			}
@@ -10683,9 +10749,8 @@ String.prototype.upperFirst = function()
 			set: function (val) 
 			{
 				real_obj = val;
-				$.each(parent_list, function(i,v){
-					v.obj.$THIS = val;
-				});
+				for (var i = 0; i < parent_list.length; i++)
+					parent_list[i].obj.$THIS = val;
 			},
 			get: function () 
 			{
@@ -10695,27 +10760,28 @@ String.prototype.upperFirst = function()
 	}
 
 	function buildProtectedThisReferenceObject(object, protected_this_reference) {
-		$.each(object, function(i,v){
-			if (!object.hasOwnProperty(i)) return;
-			if (typeof v != "function")
-				makeReference(protected_this_reference, i, object, i);
+
+		for (var k in object) {
+			if (!object.hasOwnProperty(k)) continue;
+			if (typeof object[k] != "function")
+				makeReference(protected_this_reference, k, object, k);
 			else
-			{
-				Object.defineProperty(protected_this_reference, i, 
-				{
-					enumerable : true,
-					configurable : true,
-					set: function (val) 
+				(function(k){
+					Object.defineProperty(protected_this_reference, k, 
 					{
-						protected_this_reference.$THIS[i] = val;
-					},
-					get: function () 
-					{
-						return protected_this_reference.$THIS[i];
-					}
-				});
-			}
-		});
+						enumerable : true,
+						configurable : true,
+						set: function (val) 
+						{
+							protected_this_reference.$THIS[k] = val;
+						},
+						get: function () 
+						{
+							return protected_this_reference.$THIS[k];
+						}
+					});
+				})(k);
+		}
 
 		makeReference(protected_this_reference, '$THIS', object, '$THIS');
 		makeReference(protected_this_reference, '$PARENT', object, '$PARENT');
@@ -10725,18 +10791,20 @@ String.prototype.upperFirst = function()
 	}
 
 	function construct(object_info, args) {
-		$.each(object_info.constructor_list || [], function(i,v){
-			v.apply(global, args);
-		});
+
+		object_info.constructor_list =
+			object_info.constructor_list || [];
+
+		for (var i = 0; i < object_info.constructor_list.length; i++)
+			object_info.constructor_list[i].apply(global, args);
 	}
 
 
 	function dealWithStatic(list) {
-		var me = this;
-		$.each(list, function(i,v){
-			makeProperty(me, i, v, 
-				typeof v != "function");
-		});
+		for (var k in list) {
+			var v = list[k];
+			makeProperty(this, k, v, typeof v != 'function');
+		}
 	}
 
 	
@@ -10782,9 +10850,49 @@ String.prototype.upperFirst = function()
 		});
 	}
 
+	function profile_new_object(name) {
+		var hash = global.$OBJPROFILE = global.$OBJPROFILE || {};
+		if (!(name in hash))
+			hash[name] = 0;
+		hash[name]++;
+	}
+
 })(window);
 
 
+;
+
+(function(global){
+
+	var obj_profile_snapshot = {};
+
+	global.snapObjProfile = function () {
+		obj_profile_snapshot = {};
+		for (var k in global.$OBJPROFILE)
+			obj_profile_snapshot[k] = global.$OBJPROFILE[k];
+	}
+
+	global.compareObjProfile = function() {
+
+		var diff = {};
+
+		for (var k in global.$OBJPROFILE) {
+			var delta = global.$OBJPROFILE[k] 
+				- (obj_profile_snapshot[k] || 0);
+			if (delta) 
+				diff[k] = delta;
+		}
+
+		return diff;
+	}
+
+
+})(window);
+;
+
+
+(function(){})
+{}
 ;
 
 $CLASS('XUIObject', function(me){
@@ -10888,7 +10996,7 @@ $ENUM('UI.EVENT_ID', [
 ;
 
 
-$CLASS('UI.Size', function(me){
+$STRUCT('UI.Size', function(SELF){
 
 	$PUBLIC_VAR({
 		'w' : 0,
@@ -10900,8 +11008,8 @@ $CLASS('UI.Size', function(me){
 		if (typeof w != 'undefined' &&
 			typeof h != 'undefined')
 		{
-			me.w = w;
-			me.h = h;
+			this.w = w;
+			this.h = h;
 		}
 	});
 
@@ -10909,13 +11017,15 @@ $CLASS('UI.Size', function(me){
 });
 ;
 
-$CLASS('UI.Rect', function(me){
+
+$STRUCT('UI.Rect', function(SELF){
 
 	$PUBLIC_FUN([
 		'width',
 		'height',
 		'leftTop',
 		'rightBottom',
+		'size',
 		'area',
 		'isEmpty',
 
@@ -10925,7 +11035,7 @@ $CLASS('UI.Rect', function(me){
 
 		'offset',
 
-		'toString'
+		'toString',
 	]);
 
 	$PUBLIC_VAR({
@@ -10942,28 +11052,26 @@ $CLASS('UI.Rect', function(me){
 		//			function(left_top, right_bottom)
 		//			function(rect)
 
-
-
 		if (typeof left == "undefined")
 			return;
 
 		if (left.instanceOf && left.instanceOf(UI.Pt))
 		{
 			var left_top = left;
-			me.left = left_top.x;
-			me.top = left_top.y;
+			this.left = left_top.x;
+			this.top = left_top.y;
 
 			if (top.instanceOf && top.instanceOf(UI.Size)) {
 				var size = top;
-				me.right = me.left + size.w;
-				me.bottom = me.top + size.h;
+				this.right = this.left + size.w;
+				this.bottom = this.top + size.h;
 				return;
 			}
 			
 			if (top.instanceOf && top.instanceOf(UI.Pt)) {
 				var right_bottom = top;
-				me.right = right_bottom.x;
-				me.bottom = right_bottom.y;
+				this.right = right_bottom.x;
+				this.bottom = right_bottom.y;
 				return;
 			}
 			
@@ -10973,56 +11081,60 @@ $CLASS('UI.Rect', function(me){
 		if (left.instanceOf && left.instanceOf(UI.Rect))
 		{
 			var rc = left;
-			me.left = rc.left;
-			me.top = rc.top;
-			me.right = rc.right;
-			me.bottom = rc.bottom;
+			this.left = rc.left;
+			this.top = rc.top;
+			this.right = rc.right;
+			this.bottom = rc.bottom;
 
 			return;
 		}
 
-		me.left = left;
-		me.top = top;
-		me.right = right;
-		me.bottom = bottom;
+		this.left = left;
+		this.top = top;
+		this.right = right;
+		this.bottom = bottom;	
 	});
 
-	$PUBLIC_FUN_IMPL('width', function  () { return me.right - me.left; });
-	$PUBLIC_FUN_IMPL('height',function  () { return me.bottom - me.top; } );
+	$PUBLIC_FUN_IMPL('width', function  () { return this.right - this.left; });
+	$PUBLIC_FUN_IMPL('height',function  () { return this.bottom - this.top; } );
 	
 	$PUBLIC_FUN_IMPL('leftTop', function () {
-		return new UI.Pt(me.left, me.top);
+		return new UI.Pt(this.left, this.top);
 	});
 
 	$PUBLIC_FUN_IMPL('rightBottom', function () {
-		return new UI.Pt(me.right, me.bottom);
+		return new UI.Pt(this.right, this.bottom);
 	});
 
 	$PUBLIC_FUN_IMPL('area', function  () {
-		return (me.bottom - me.top) * (me.right - me.left);
+		return (this.bottom - this.top) * (this.right - this.left);
 	});
 
+	$PUBLIC_FUN_IMPL('size', function () {
+		return new UI.Size(this.width(), this.height());
+	})
+
 	$PUBLIC_FUN_IMPL('isEmpty', function () {
-		return me.bottom <= me.top || me.right <= me.left;
+		return this.bottom <= this.top || this.right <= this.left;
 	});
 
 	$PUBLIC_FUN_IMPL('equals', function (rc) {
-		return me.top == rc.top &&
-			me.bottom == rc.bottom &&
-			me.left == rc.left &&
-			me.right == rc.right;
+		return this.top == rc.top &&
+			this.bottom == rc.bottom &&
+			this.left == rc.left &&
+			this.right == rc.right;
 	});
 
 	$PUBLIC_FUN_IMPL('intersect', function (rc) {
 		var new_rect = new UI.Rect();
 		do 
 		{
-			new_rect.top = Math.max(me.top, rc.top);
-			new_rect.bottom = Math.min(me.bottom, rc.bottom);
+			new_rect.top = Math.max(this.top, rc.top);
+			new_rect.bottom = Math.min(this.bottom, rc.bottom);
 			if (new_rect.top > new_rect.bottom) break;
 
-			new_rect.left = Math.max(me.left, rc.left);
-			new_rect.right = Math.min(me.right, rc.right);
+			new_rect.left = Math.max(this.left, rc.left);
+			new_rect.right = Math.min(this.right, rc.right);
 			if (new_rect.left > new_rect.right) break;
 
 			return new_rect;
@@ -11040,20 +11152,20 @@ $CLASS('UI.Rect', function(me){
 			y = pt.y;
 		}
 
-		me.left += x;
-		me.top += y;
-		me.right += x;
-		me.bottom += y;
+		this.left += x;
+		this.top += y;
+		this.right += x;
+		this.bottom += y;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function () {
 		return "left:%, top:%, right:%, bottom:%"
-			.format(me.left, me.top, me.right, me.bottom);
+			.format(this.left, this.top, this.right, this.bottom);
 	});
 });
 ;
 
-$CLASS('UI.Pt', function(me){
+$STRUCT('UI.Pt', function(SELF){
 
 	$PUBLIC_VAR({
 		'x' : 0,
@@ -11076,24 +11188,24 @@ $CLASS('UI.Pt', function(me){
 
 		if (x.instanceOf && x.instanceOf(UI.Pt)) {
 			var pt = x;
-			me.x = pt.x;
-			me.y = pt.y;
+			this.x = pt.x;
+			this.y = pt.y;
 			return;
 		}
 
-		me.x = x;
-		me.y = y;
+		this.x = x;
+		this.y = y;
 	});
 
 	$PUBLIC_FUN_IMPL('inRect', function(rc){
-		return me.x >= rc.left &&
-			me.x < rc.right &&
-			me.y >= rc.top &&
-			me.y < rc.bottom;
+		return this.x >= rc.left &&
+			this.x < rc.right &&
+			this.y >= rc.top &&
+			this.y < rc.bottom;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function(){
-		return 'x:%, y:%'.format(me.x, me.y);
+		return 'x:%, y:%'.format(this.x, this.y);
 	});
 
 });
@@ -11118,7 +11230,7 @@ $CLASS('UI.Pt', function(me){
 })();
 
 
-$CLASS('UI.IXNotificationLister', function(me,SELF){
+$CLASS('UI.IXNotificationListener', function(me,SELF){
 
 	$PUBLIC_FUN({
 		'onNotification' 	: $ABSTRACT,
@@ -11128,11 +11240,52 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 	});
 
 });
+
+$CLASS('UI.EasyNotificationListener', 
+$EXTENDS(UI.IXNotificationListener),
+function(me,SELF){
+
+	$PUBLIC_FUN([
+		'onNotification',
+		'genRemoteRef',
+		'recycleRemoteRef',
+		'destroy',
+	]);
+
+	$CONSTRUCTOR(function(callback){
+		m_callback = callback;
+	});
+
+	var m_callback = null;
+	var m_remote_ref = [];
+	
+	$PUBLIC_FUN_IMPL('onNotification', function(n){
+		m_callback(n);
+	});
+
+	$PUBLIC_FUN_IMPL('genRemoteRef', function(){
+		var ref = {'obj' : me.$THIS};
+		m_remote_ref.push(ref);
+		return ref;
+	});
+
+	$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
+		var index = m_remote_ref.indexOf(ref);
+		m_remote_ref.splice(index, 1);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function() {
+		$.each(m_remote_ref, function(i,v){
+			v.obj = null;
+		});
+		m_remote_ref = [];
+	});
+});
 ;
 
 (function(){
 	$CLASS('UI.XFrame', 
-	$EXTENDS(UI.IXNotificationLister),
+	$EXTENDS(UI.IXNotificationListener),
 	function(me, SELF){
 
 		$PUBLIC_FUN([
@@ -11171,6 +11324,11 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			'getRect',
 			'setRect',
 
+			'setScrollX',
+			'setScrollY',
+			'getScrollX',
+			'getScrollY',
+
 			'generateLayoutParam',
 			'beginUpdateLayoutParam',
 			'endUpdateLayoutParam',
@@ -11193,6 +11351,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			'addFrame',
 			'insertFrame',
 			'removeFrame',
+			'getFrameCount',
 			'getFrameByIndex',
 			'setParent',
 			'getParent',
@@ -11270,6 +11429,9 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		var m_active = false;
 
+		var m_scrollX = 0;
+		var m_scrollY = 0;
+
 
 		$PUBLIC_FUN_IMPL('setName', function(name){
 			m_name = name;
@@ -11279,7 +11441,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			return m_name;
 		});
 
-		$PUBLIC_FUN_IMPL('getFrameByName', function(){
+		$PUBLIC_FUN_IMPL('getFrameByName', function(name){
 			if (m_name == name) return me;
 
 			for (var i = 0; i < m_child_frames.length; i++) {
@@ -11450,6 +11612,33 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 				});
 		});
 
+		$PUBLIC_FUN_IMPL('setScrollX', function(x){
+
+			if (m_scrollX == x)
+				return;
+
+			updateScroll(x - m_scrollX, 0);
+
+			m_scrollX = x;
+		});
+
+		$PUBLIC_FUN_IMPL('setScrollY', function(y){
+			if (m_scrollY == y)
+				return;
+
+			updateScroll(0, y - m_scrollY);
+
+			m_scrollY = y;
+		});
+
+		$PUBLIC_FUN_IMPL('getScrollX', function(){
+			return m_scrollX;
+		});
+
+		$PUBLIC_FUN_IMPL('getScrollY', function(){
+			return m_scrollY;
+		});
+
 		$PUBLIC_FUN_IMPL('setBackground', function(background){
 			if (m_background == background)
 				return null;
@@ -11460,7 +11649,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			if (m_background) {
 				m_background.setDstRect(
-					new UI.Rect(0,0,m_rect.width(), m_rect.height));
+					new UI.Rect(0,0,m_rect.width(), m_rect.height()));
 				m_background.onImageLoaded(me.onBackgroundLoaded);
 			}
 
@@ -11636,11 +11825,13 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			// overload invalidateRect(). 
 			if (typeof rc == 'undefined') {
-				me.invalidateRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
+				rc = new UI.Rect(0, 0, m_rect.width(), m_rect.height());
+				me.invalidateRect(rc);
 				return;
 			}
 
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return;
+
 			if (rc.isEmpty()) return;
 
 			var rect_real = rc.intersect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
@@ -11684,11 +11875,13 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 			if (typeof index_or_frame != "number") {
 				var frame = index_or_frame;
 				var index = m_child_frames.indexOf(frame);
-				me.removeFrame(index);
-				return;
+				if (index == -1) return null;
+				return me.removeFrame(index);
 			}
 
 			var index = index_or_frame;
+			if (index >= m_child_frames.length) return null;
+
 			var frame = m_child_frames[index];
 
 			m_child_frames.splice(index, 1);
@@ -11710,6 +11903,10 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 				return null;
 
 			return m_child_frames[i];
+		});
+
+		$PUBLIC_FUN_IMPL('getFrameCount', function(){
+			return m_child_frames.length;
 		});
 
 		$PUBLIC_FUN_IMPL('setParent', function (parent){
@@ -11735,8 +11932,10 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		$PUBLIC_FUN_IMPL('paintUI', function(ctx, rect){
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
 				return;
+
 			me.paintBackground(ctx, rect);
 			me.paintForeground(ctx, rect);
+
 		});
 
 		$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
@@ -11771,6 +11970,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 				if (rect_paint.isEmpty()) continue;
 
 				ctx.save();
+
 				ctx.beginPath();
 
 				ctx.rect(rect_paint.left, rect_paint.top,
@@ -11810,6 +12010,8 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
 
+			notification.src = me.$THIS;
+
 			var notification_listeners = m_notification_listener;
 
 			for (var i = 0; i < notification_listeners.length; /*no i++*/) {
@@ -11826,6 +12028,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		$PUBLIC_FUN_IMPL('genRemoteRef', function(){
 			var ref = {'obj' : me.$THIS};
 			m_remote_ref.push(ref);
+			return ref;
 		});
 
 		$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
@@ -11916,6 +12119,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 
 		$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rect){
+
 			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
 				var pt = pt_or_rect;
 				return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
@@ -11930,6 +12134,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		});
 
 		$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rect){
+
 			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
 				var pt = pt_or_rect;
 				return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
@@ -12006,6 +12211,11 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('layout', function(rc){
 
+			if (m_parent) {
+				rc = new UI.Rect(rc);
+				rc.offset(-m_parent.getScrollX(), -m_parent.getScrollY());
+			}	
+
 			if (!m_rect.equals(rc) || m_layout_invalid) {
 				m_layout_invalid = false;
 				me.onLayout(rc);
@@ -12025,13 +12235,13 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
 			m_measured_width = 
-				onMeasureLayoutDirect(param, 
+				onMeasureLayoutDirection(param, 
 					'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
 		});
 
 		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
 			m_measured_height =
-				onMeasureLayoutDirect(param,
+				onMeasureLayoutDirection(param,
 					'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
 		});
 
@@ -12112,7 +12322,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		});
 
 
-		function onMeasureLayoutDirect(param, child_measure_proc, child_get_measured_proc,
+		function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
 			layout_param_pos, layout_param_size, layout_margin_end) {
 
 			var measured_size = 0;
@@ -12138,8 +12348,8 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
 							param_for_measure.num = Math.max(0, param.num - layout_param[layout_param_pos]);
 						} else {
-							param.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
-							param.num = 0;
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+							param_for_measure.num = 0;
 						}
 						break;
 					default:
@@ -12204,6 +12414,15 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		function fillSelectedLayer() {
 			if (m_selected_layer) return;
 			me.setSelectedLayer(UI.XResourceMgr.getImage('img/layer/selected.9.png'));
+		}
+
+		function updateScroll(offset_x, offset_y) {
+			for (var i = 0; i < m_child_frames.length; i++) {
+				var c = m_child_frames[i];
+				var frame_rect = new UI.Rect(c.getRect());
+				frame_rect.offset(-offset_x, -offset_y);
+				c.setRect(frame_rect);
+			}
 		}
 
 	}).
@@ -12291,7 +12510,6 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 			return v - 0 || 0;
 		}
-
 	});
 
 	$ENUM('UI.XFrame.LayoutParam.SpecialMetrics', 
@@ -12300,11 +12518,15 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		'METRIC_WRAP_CONTENT'
 	]);
 
-	$CLASS('UI.XFrame.MeasureParam', function(me, SELF){
+	$STRUCT('UI.XFrame.MeasureParam', function(SELF){
 
 		$PUBLIC_VAR({
-			'spec' 	: SELF.Spec.MEASURE_UNRESTRICTED,
+			'spec' 	: null,
 			'num'	: 0
+		});
+
+		$CONSTRUCTOR(function(){
+			this.spec = SELF.Spec.MEASURE_UNRESTRICTED;
 		});
 
 		$PUBLIC_FUN([
@@ -12314,17 +12536,17 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 		]);
 
 		$PUBLIC_FUN_IMPL('reset', function(){
-			me.spec =  SELF.Spec.MEASURE_UNRESTRICTED,
-			me.num = 0;
+			this.spec =  SELF.Spec.MEASURE_UNRESTRICTED,
+			this.num = 0;
 		});
 
 		$PUBLIC_FUN_IMPL('equals', function(other){
-			return me.spec == other.spec &&
-				me.num == other.num;
+			return this.spec == other.spec &&
+				this.num == other.num;
 		});
 
 		$PUBLIC_FUN_IMPL('notequals', function(other){
-			return !me.equals(other);
+			return !this.equals(other);
 		});
 	});
 
@@ -12807,7 +13029,7 @@ $CLASS('UI.IXNotificationLister', function(me,SELF){
 
 		var frame = new this();
 		frame.create(container, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE);
+			this.Visibility.VISIBILITY_NONE);
 
 		return frame;
 	}
@@ -12834,6 +13056,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	var m_mouse_leave_message = { id : 'mouseleave'};
 	var m_focus_raw_event = {type : 'focus'};
 	var m_blur_raw_event = {type : 'blur'};
+
+	var m_mouse_wheel_pixel_unit = 33.3333;
 
 	$CONSTRUCTOR(function(root_frame, $position_canvas){
 		m_root_frame = root_frame;
@@ -12913,7 +13137,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				{'event' : 'mouseup', 'handle' : false},
 				{'event' : 'dblclick', 'handle' : false},
 				{'event' : 'mousemove', 'handle' : false},
-				{'event' : 'mousewheel', 'handle' : false},
+				{'event' : 'wheel', 'handle' : false},
 				{'event' : 'keydown', 'handle' : false},
 				{'event' : 'keyup', 'handle' : false},
 			];
@@ -12922,6 +13146,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	}
 
 	function onEvent(e) {
+
+
 
 		var offset_frame = m_$position_canvas.offset();
 		if (typeof e.pageX != 'undefined' &&
@@ -13027,6 +13253,21 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 				msg4frame.UI_pt = 
 					target.otherFrameToThisFrame(m_root_frame, msg4frame.UI_pt);
 				break;
+
+			case 'wheel':
+				var delta = msg4frame.UI_delta = e.originalEvent.deltaY;
+				switch (e.originalEvent.deltaMode) {
+					// pixel
+					case 0: 
+						msg4frame.UI_delta = Math.round(delta / m_mouse_wheel_pixel_unit);
+						break;
+					// line
+					case 1: 
+						break;
+					// page
+					case 2:
+						msg4frame.UI_delta = Math.round(Math.abs(delta) / delta);
+				}
 
 			default:
 				break;
@@ -13167,7 +13408,8 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 			var frame = frame_class.buildFromXML(xml_node, parent);
 
-			frame.configFrameByXML(xml_node);
+			if (frame)
+				frame.configFrameByXML(xml_node);
 
 			return frame;
 		});
@@ -13260,7 +13502,7 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 		type_list_name /* = null*/, default_type /* = null*/, part_rect_list_prefix /* = null*/) {
 
 		var path_list = xml_node.getAttribute(path_list_name);
-		if (!path_list) return;
+		if (!path_list) return [];
 		path_list = path_list.split(this.SPLIT_REGEXP);
 
 		var attr;
@@ -13271,17 +13513,19 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 
 		var part_left_list = [], part_top_list = [], 
 			part_width_list = [], part_height_list = [];
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'left')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'left')))
 			part_left_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'top')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'top')))
 			part_top_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'width')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'width')))
 			part_width_list = attr.split(this.SPLIT_REGEXP);
-		if (part_rect_prefix && (attr = xml_node.getAttribute(part_rect_prefix + 'height')))
+		if (part_rect_list_prefix && (attr = xml_node.getAttribute(part_rect_list_prefix + 'height')))
 			part_height_list = attr.split(this.SPLIT_REGEXP);
 
 		var rst = [];
 		for (var i = 0; i < path_list.length; i++) {
+			var c = path_list[i];
+
 			var image = new UI.XImageCanvasImage();
 			image.load(c);
 
@@ -13669,6 +13913,7 @@ function(me, SELF){
 	var m_loaded = false;
 	var m_image_loaded_listener = [];
 
+	var m_formatted_img = false;
 
 	$PUBLIC_FUN_IMPL('load', function (path) {
 
@@ -13676,6 +13921,13 @@ function(me, SELF){
 		m_unloaded_part_rect = 
 		m_unloaded_draw_type =
 		null;
+
+		var filename = getFileNameFromPath(path);
+		filename = filename.toLowerCase();
+		m_formatted_img = 
+			filename.indexOf('.normal.') != -1 ||
+			filename.indexOf('.stretch.') != -1 ||
+			filename.indexOf('.9.') != -1;
 
 		if (path.substr(0, 1) == '@')
 			loadAsResource(path.substr(1));
@@ -13752,9 +14004,7 @@ function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('isFormattedImage', function(){
-		return m_img.src.indexOf('.normal.') != -1 ||
-			m_img.src.indexOf('.stretch.') != -1 ||
-			m_img.src.indexOf('.9.') != -1;
+		return m_formatted_img;
 	});
 
 	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
@@ -13869,6 +14119,7 @@ function(me, SELF){
 			case SELF.DrawType.DIT_3PARTV: 
 				draw3PartV(m_buffer.getContext('2d')); 
 				break;
+			// TODO : draw center. 
 		}
 	}
 
@@ -13878,13 +14129,14 @@ function(me, SELF){
 		var height = m_src_rect.height();
 
 		m_img.draw(ctx, 
-		new UI.Rect(m_src_rect.left, m_src_rect.top, width, height),
+		new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), new UI.Size(width, height)),
 		new UI.Rect(0, 0, width, height));
 	}
 
 	function drawStretch(ctx) {
 		m_img.draw(ctx, 
-		new UI.Rect(m_src_rect.left, m_src_rect.top, m_src_rect.width(), m_src_rect.height()),
+		new UI.Rect(new UI.Pt(m_src_rect.left, m_src_rect.top), 
+			new UI.Size(m_src_rect.width(), m_src_rect.height())),
 		new UI.Rect(0, 0, m_dst_rect.width(), m_dst_rect.height()));
 	}
 
@@ -13953,11 +14205,13 @@ function(me, SELF){
 
 
 	function loadFormattedImageInfo() {
-		if (m_img.src.toLowerCase().indexOf('.normal.') != -1)
+		var filename = getFileNameFromPath(m_img.src);
+		filename = filename.toLowerCase();
+		if (filename.indexOf('.normal.') != -1)
 			m_draw_type = SELF.DrawType.DIT_NORMAL;
-		else if (m_img.src.toLowerCase().indexOf('.stretch.') != -1)
+		else if (filename.indexOf('.stretch.') != -1)
 			m_draw_type = SELF.DrawType.DIT_STRETCH;
-		else if (m_img.src.toLowerCase().indexOf('.9.') != -1) {
+		else if (filename.indexOf('.9.') != -1) {
 			m_draw_type = SELF.DrawType.DIT_9PART;
 			if (!m_unloaded_part_rect) loadFormattedImagePartInfo();
 			m_img.clip(1, 1, m_img.getWidth() - 2, m_img.getHeight() - 2);
@@ -14020,7 +14274,10 @@ function(me, SELF){
 		m_src_rect.right = m_img.getWidth();
 		m_src_rect.bottom = m_img.getHeight();
 	}
-	
+
+	function getFileNameFromPath(path) {
+		return path.substring(path.lastIndexOf('/') + 1);
+	}
 
 })
 .$STATIC({
@@ -14055,7 +14312,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	var m_bold = false;
 	var m_italic = false;
 
-	var m_line_height = 13 * m_line_height_mutiplier;
+	var m_line_height = Math.round(13 * m_line_height_mutiplier);
 
 	var m_measure_canvas = null;
 
@@ -14088,10 +14345,11 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			ctx.restore();
 			return;
 		}
+
 			
 
 		var y_start = getYStart(valign, lines.length, rect.height());
-		var y_current = y_start + (m_line_height - m_font_size) / 2;
+		var y_current = y_start + Math.floor((m_line_height - m_font_size) / 2);
 		for (var i = 0; i < lines.length; i++) {
 			var c = lines[i];
 			var x_current = getXStart(halign, c.width, rect.width());
@@ -14105,11 +14363,12 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
+		face = normalFontFace(face);
 		m_font_face = face;
 	});
 	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
 		m_font_size = size - 0;
-		m_line_height = size * m_line_height_mutiplier;
+		m_line_height = Math.round(size * m_line_height_mutiplier);
 	});
 
 	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
@@ -14227,7 +14486,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		var max_x = 0, max_y = 0;
 
 		max_x = rect.width();
-		max_y = Math.ceil(lines.length * m_line_height);
+		max_y = lines.length * m_line_height;
 
 		var temp_canvas = document.createElement('canvas');
 		temp_canvas.width = max_x;
@@ -14260,9 +14519,20 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			if (top_found && bottom_found) break;
 		}
 
-		ctx.drawImage(temp_canvas, rect.left, rect.top - rect_bound.top + Math.floor((rect.height() - rect_bound.height()) / 2));
+		ctx.drawImage(temp_canvas, 
+			rect.left, rect.top - rect_bound.top + Math.floor((rect.height() - rect_bound.height()) / 2));
+	}
 
-		console.log( rect.height() - rect_bound.height() );
+	function normalFontFace (face) {
+		var face = face.split(/,/);
+		$.each(face, function(i,v){
+			var normal_value = $.trim(v);
+			if (normal_value.indexOf(' ') != -1)
+				normal_value = '\'' + normal_value + '\'';
+			face[i] = normal_value;
+		});
+		face = face.join(',');
+		return face;
 	}
 
 	
@@ -14364,6 +14634,444 @@ $CLASS('UI.XCanvasImage', function(me){
 	});
 
 });
+;
+
+
+(function(){
+
+	$CLASS('UI.XButton', 
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'onBackgroundLoaded',
+			
+			'onMeasureWidth',
+			'onMeasureHeight',
+
+			'setBackground',
+		]);
+
+		$MESSAGE_MAP('EVENT', 
+		[
+			$MAP('mousedown', 'onMouseDown'),
+			$MAP('mouseup', 'onMouseUp'),
+			$MAP('mouseleave', 'onMouseLeave'),
+			$MAP('mouseenter', 'onMouseEnter'),
+			$CHAIN(UI.XFrame),
+		]);
+
+		var m_disabled = false;
+		var m_mouse_in = false;
+		var m_mouse_down = false;
+
+		$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility /* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+			disabled /* = false */, background /* = null */) {
+
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+
+			disabled = disabled || false;
+			m_disabled = disabled;
+
+			if (!background)
+				background = UI.XResourceMgr.getImage('img/ctrl/button.9.png');
+			me.setBackground(background);
+
+	//		refreshButtonFace();
+		});
+
+		$PUBLIC_FUN_IMPL('setBackground', function(background){
+			var img = me.$PARENT(UI.XFrame).setBackground(background);
+
+			me.invalidateLayout();
+			refreshButtonFace();
+
+			return img;
+		});
+
+		$PUBLIC_FUN_IMPL('onBackgroundLoaded', function(){
+			// me.$PARENT(UI.XFrame).onBackgroundLoaded();
+			me.invalidateLayout();
+			refreshButtonFace();
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			m_disabled = false;
+			m_mouse_in = false;
+			m_mouse_down = false;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
+				param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
+				me.$PARENT(UI.XFrame).onMeasureWidth(param);
+				return;
+			}
+
+			var wrap_size = 0;
+			var background = me.getBackground();
+			if (background && background.isImageLoaded())
+				wrap_size = background.getImageWidth() / 4;
+
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+				wrap_size = Math.min(wrap_size, param.num);
+
+			var wrap_measure_param = new SELF.MeasureParam();
+			wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+			wrap_measure_param.num = wrap_size;
+
+			me.$PARENT(UI.XFrame).onMeasureWidth(wrap_measure_param);
+
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
+				param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
+				me.$PARENT(UI.XFrame).onMeasureHeight(param);
+				return;
+			}
+
+			var wrap_size = 0;
+			var background = me.getBackground();
+			if (background && background.isImageLoaded())
+				wrap_size = background.getImageHeight();
+
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+				wrap_size = Math.min(wrap_size, param.num);
+
+			var wrap_measure_param = new SELF.MeasureParam();
+			wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+			wrap_measure_param.num = wrap_size;
+
+			me.$PARENT(UI.XFrame).onMeasureHeight(wrap_measure_param);
+		});
+
+		$MESSAGE_HANDLER('onMouseDown', function(){
+
+			if (m_disabled) return true;
+
+			m_mouse_down = true;
+
+			refreshButtonFace();
+
+			me.getEventManager().captureMouse(me.$THIS);
+
+			return true;
+		});
+
+		$MESSAGE_HANDLER('onMouseUp', function(e){
+
+			if (!m_mouse_down) return true;
+			m_mouse_down = false;
+			me.getEventManager().releaseCaptureMouse(me.$THIS);
+
+			if (m_disabled) return true;
+
+			refreshButtonFace();
+
+			if (e.UI_pt.inRect(me.parentToChild(me.getRect())))
+				me.throwNotification(
+					{
+						'id' : SELF.NOTIFICATION.NOTIFICATION_BUTTON_CLICKED,
+					});
+
+			return true;
+		});
+
+		$MESSAGE_HANDLER('onMouseLeave', function(){
+			m_mouse_in = false;
+			if (m_disabled) return;
+			refreshButtonFace();
+		});
+
+		$MESSAGE_HANDLER('onMouseEnter', function(){
+			m_mouse_in = true;
+			if (m_disabled) return;
+			refreshButtonFace();
+		});
+
+		function refreshButtonFace() {
+			var background = me.getBackground();
+			if (!background.isImageLoaded()) return;
+
+			var state = m_disabled ? 
+				SELF.BtnState.BTN_DISABLED : SELF.BtnState.BTN_NORMAL;
+
+			if (!m_disabled && m_mouse_in)
+				state = m_mouse_down ? SELF.BtnState.BTN_DOWN : SELF.BtnState.BTN_HOVER;
+
+			background.setSrcRect(new UI.Rect(
+				new UI.Pt(state * background.getImageWidth() / 4, 0),
+				new UI.Size(background.getImageWidth() / 4, background.getImageHeight())));
+
+			me.invalidateRect();
+		}
+
+	}).
+	$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	function buildFromXML(xml_node, parent) {
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		xml_node.removeAttribute('bg');
+		var face = 
+			UI.XFrameXMLFactory.buildImage(xml_node, 'face',
+				'face_type', 'stretch', 'face_part_');
+
+		var disabled = false;
+		var disabled_attr = 
+			xml_node.getAttribute('disabled') || '';
+		disabled_attr = disabled_attr.toLowerCase();
+		if (disabled_attr == 'true')
+			disabled = true;
+
+		var frame = new this();
+		frame.create(parent, layout_param, this.Visibility.VISIBILITY_NONE,
+			disabled, face);
+
+		return frame;
+	}
+
+	$ENUM('UI.XButton.BtnState', {
+		'BTN_NORMAL' 	: 0,
+		'BTN_HOVER'  	: 1,
+		'BTN_DOWN'	 	: 2,
+		'BTN_DISABLED' 	: 3,
+	});
+
+	$ENUM('UI.XButton.NOTIFICATION', [
+		'NOTIFICATION_BUTTON_CLICKED',
+	]);
+
+})();
+
+
+;
+
+(function(){
+
+	$CLASS('UI.XMultifaceButton', 
+	$EXTENDS(UI.XButton),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'changeButtonFaceTo',
+		]);
+
+		var m_faces = [];
+		var m_current_face = 0;
+
+		$PUBLIC_FUN_IMPL('create', function(parent, faces, layout, 
+			visibility /* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+			start_face /* =0 */,
+			disabled /* = false */) {
+
+			m_faces = faces;
+
+			var background = faces[0] || null;
+			start_face = start_face || 0;		
+			if (start_face < faces.length) {
+				m_current_face = start_face;
+				background = faces[start_face];
+			}
+
+			me.$PARENT(UI.XButton).create(parent, layout, visibility, disabled, background);
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+
+			me.setBackground(null);
+
+			m_faces = [];
+			m_current_face = 0;
+
+			me.$PARENT(UI.XButton).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('changeButtonFaceTo', function(index){
+			if (index >= m_faces.length) return;
+			if (m_current_face == index) return;
+
+			m_current_face = index;
+
+			me.setBackground(m_faces[index]);
+		});
+
+	}).
+	$STATIC({
+		buildFromXML : buildFromXML,
+	});
+
+	function buildFromXML(xml_node, parent) {
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		xml_node.removeAttribute('bg');
+		
+		var faces = 
+			UI.XFrameXMLFactory.buildImageList(xml_node, 'faces',
+				'face_types', 'stretch', 'face_parts_');
+		if (!faces.length)
+			UI.XFrameXMLFactory.reportError('WARNING: No face specified for the multi-face button, will use default button face. ');
+
+
+		var disabled = false;
+		var disabled_attr = xml_node.getAttribute('disabled') || '';
+		disabled_attr = disabled_attr.toLowerCase();
+		if (disabled_attr == 'true')
+			disabled = true;
+
+		var start_face = xml_node.getAttribute('start_face') || 0;
+
+		var frame = new this();
+		frame.create(parent, faces, layout_param, this.Visibility.VISIBILITY_NONE,
+			start_face, disabled);
+
+		return frame;
+
+	}
+
+
+})();
+;
+
+$CLASS('UI.XScrollView',
+$EXTENDS(UI.XFrame),
+function(me, SELF) {
+
+	$PUBLIC_FUN([
+		'onMeasureWidth',
+		'onMeasureHeight',
+
+		'onLayout',
+
+		'destroy', 
+	]);
+
+	var m_max_x = 0;
+	var m_max_y = 0;
+
+	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+		var measured_width = 
+			onMeasureLayoutDirection(param, 
+				'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
+		me.setMeasuredWidth(measured_width);
+	});
+
+	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+		var measured_height =
+			onMeasureLayoutDirection(param,
+				'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
+		me.setMeasuredHeight(measured_height);
+	});
+
+	$PUBLIC_FUN_IMPL('onLayout', function(param){
+
+		var max_x = 0, max_y = 0;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+			var layout_param = cur.getLayoutParam();
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var rect = new UI.Rect(layout_param.x, layout_param.y,
+				layout_param.x + cur.getMeasuredWidth(),
+				layout_param.y + cur.getMeasuredHeight());
+
+			max_x = Math.max(max_x, rect.right);
+			max_y = Math.max(max_y, rect.bottom);
+
+			cur.layout(rect);
+		}
+
+		handleMaxXY(max_x, max_y);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		me.$PARENT(UI.XFrame).destroy();
+		m_max_x = m_max_y = 0;
+	});
+
+	function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
+			layout_param_pos, layout_param_size, layout_margin_end) {
+
+		var measured = 0;
+		if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+			measured = param.num;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+
+			var layout_param = cur.getLayoutParam();
+
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var param_for_measure = new SELF.MeasureParam();
+
+			switch (layout_param[layout_param_size]) {
+				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+					param_for_measure.num = 0;
+					break;
+				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = max(0, 
+						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
+					break;
+				default:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
+					break;
+			}
+
+			cur[child_measure_proc](param_for_measure);
+		}
+
+		return measured;
+	}
+
+	function handleMaxXY(max_x, max_y) {
+		if (m_max_x == max_x &&
+			m_max_y == max_y)
+			return;
+
+		var old = {max_x: m_max_x, max_y: m_max_y};
+		m_max_x = max_x;
+		m_max_y = max_y;
+
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED,
+				new : {
+					'max_x' : m_max_x,
+					'max_y' : m_max_y,
+				},
+				old : old
+			});
+	}
+});
+
+$ENUM('UI.XScrollView.NOTIFICATION', [
+	'NOTIFICAITON_BOUND_CHANGED',
+]);
 ;
 
 (function() {
@@ -14496,7 +15204,7 @@ $CLASS('UI.XCanvasImage', function(me){
 
 		var frame = new this();
 		frame.create(parent, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE, text);
+			this.Visibility.VISIBILITY_NONE, text);
 
 		return frame;
 	}
@@ -14504,7 +15212,7 @@ $CLASS('UI.XCanvasImage', function(me){
 })();
 ;
 
-$CLASS('UI.XButton', 
+$CLASS('UI.XScrollBar',
 $EXTENDS(UI.XFrame),
 function(me, SELF){
 
@@ -14512,178 +15220,975 @@ function(me, SELF){
 		'create',
 		'destroy',
 
-		'onBackgroundLoaded',
-		
-		'onMeasureWidth',
-		'onMeasureHeight',
+		'setContentLen',
+		'setViewLen',
+		'setScrollPos',
+		'getScrollPos',
 
-		'setBackground',
+		'setBarImage',
+
+		'setVisibility',
+		'setRect',
+		'paintForeground',
 	]);
 
 	$MESSAGE_MAP('EVENT', 
 	[
 		$MAP('mousedown', 'onMouseDown'),
 		$MAP('mouseup', 'onMouseUp'),
-		$MAP('mouseleave', 'onMouseLeave'),
-		$MAP('mouseenter', 'onMouseEnter'),
+		$MAP('mousemove', 'onMouseMove'),
+		$MAP('wheel', 'onMouseWheel'),
+		$CHAIN(UI.XFrame),
 	]);
 
-	var m_disabled = false;
-	var m_mouse_in = false;
+	var m_type;
+
+	var m_bar_image = null;
+	
+	var m_content_len = 0;
+	var m_view_len = 0;
+
+	var m_pos = 0;
+	var m_bar_rect = new UI.Rect();
+	var m_visible_state = false;
 	var m_mouse_down = false;
+	var m_mouse_down_pt = new UI.Pt();
+	var m_mouse_down_scroll_pos = 0;
 
-	$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility /* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
-		disabled /* = false */, background /* = null */) {
 
-		me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+	$PUBLIC_FUN_IMPL('create', function(parent, scroll_type, layout_param, 
+		visibility /* = SELF.Visibility.VISIBILITY_NONE */,
+		bar_background /* = null */, bar_image /* = null */){
 
-		disabled = disabled || false;
-		m_disabled = disabled;
+		me.$PARENT(UI.XFrame).create(parent, layout_param, visibility);
+		m_type = scroll_type;
 
-		if (!background)
-			background = UI.XResourceMgr.getImage('img/ctrl/button.9.png');
-		me.setBackground(background);
+		if (!bar_background)
+			if (scroll_type == SELF.ScrollType.SCROLL_H)
+				bar_background = UI.XResourceMgr.getImage('img/ctrl/scroll_bkgH.9.png');
+			else
+				bar_background = UI.XResourceMgr.getImage('img/ctrl/scroll_bkg.9.png');
 
-//		refreshButtonFace();
-	});
+		if (!bar_image)
+			if (scroll_type == SELF.ScrollType.SCROLL_H)
+				bar_image = UI.XResourceMgr.getImage('img/ctrl/scrollH.9.png');
+			else
+				bar_image = UI.XResourceMgr.getImage('img/ctrl/scroll.9.png');
 
-	$PUBLIC_FUN_IMPL('setBackground', function(background){
-		var img = me.$PARENT(UI.XFrame).setBackground(background);
-
-		me.invalidateLayout();
-		refreshButtonFace();
-
-		return img;
-	});
-
-	$PUBLIC_FUN_IMPL('onBackgroundLoaded', function(){
-		// me.$PARENT(UI.XFrame).onBackgroundLoaded();
-		me.invalidateLayout();
-		refreshButtonFace();
+		me.setBarImage(bar_image);
+		me.setBackground(bar_background);
 	});
 
 	$PUBLIC_FUN_IMPL('destroy', function(){
-		m_disabled = false;
-		m_mouse_in = false;
+
+		me.setBarImage(null);
+
+		m_content_len = 0;
+		m_view_len = 0;
+
+		m_pos = 0;
+		m_bar_rect = new UI.Rect();
+		m_visible_state = false;
 		m_mouse_down = false;
+		m_mouse_down_pt = new UI.Pt();
+		m_mouse_down_scroll_pos = 0;
+
 		me.$PARENT(UI.XFrame).destroy();
 	});
 
-	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-		if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
-			param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
-			me.$PARENT(UI.XFrame).onMeasureWidth(param);
-			return;
+	$PUBLIC_FUN_IMPL('setBarImage', function(image){
+		if (m_bar_image == image) return;
+		
+		var old = m_bar_image;
+		m_bar_image = image;
+
+		if (m_bar_image) {
+			m_bar_image.onImageLoaded(onBarImageLoaded);
+			m_bar_image.setDstRect(m_bar_rect);
 		}
+		
+		me.invalidateRect(m_bar_rect);
 
-		var wrap_size = 0;
-		var background = me.getBackground();
-		if (background && background.isImageLoaded())
-			wrap_size = background.getImageWidth() / 4;
+		if (old)
+			old.offImageLoaded(onBarImageLoaded);
+		
+		return old;
+	});
 
-		if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
-			wrap_size = Math.min(wrap_size, param.num);
 
-		var wrap_measure_param = new SELF.MeasureParam();
-		wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-		wrap_measure_param.num = wrap_size;
+	$PUBLIC_FUN_IMPL('setContentLen', function(len){
+		if (m_content_len == len) return;
 
-		me.$PARENT(UI.XFrame).onMeasureWidth(wrap_measure_param);
+		m_content_len = len;
+		updateScrollBar();
 
 	});
 
-	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-		if (param.spec != SELF.MeasureParam.Spec.MEASURE_ATMOST &&
-			param.spec != SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED) {
-			me.$PARENT(UI.XFrame).onMeasureHeight(param);
-			return;
-		}
+	$PUBLIC_FUN_IMPL('setViewLen', function(len){
+		if (m_view_len == len) return;
 
-		var wrap_size = 0;
-		var background = me.getBackground();
-		if (background && background.isImageLoaded())
-			wrap_size = background.getImageHeight();
-
-		if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
-			wrap_size = Math.min(wrap_size, param.num);
-
-		var wrap_measure_param = new SELF.MeasureParam();
-		wrap_measure_param.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-		wrap_measure_param.num = wrap_size;
-
-		me.$PARENT(UI.XFrame).onMeasureHeight(wrap_measure_param);
+		m_view_len = len;
+		updateScrollBar();
 	});
 
-	$MESSAGE_HANDLER('onMouseDown', function(){
+	$PUBLIC_FUN_IMPL('setScrollPos', function(pos){
 
-		if (m_disabled) return true;
+		pos = adjustScrollPos(pos);
 
-		m_mouse_down = true;
+		if (m_pos == pos)
+			return;
 
-		refreshButtonFace();
+		m_pos = pos;
+		updateScrollBar();
 
-		me.getEventManager().captureMouse(me.$THIS);
+		notifyScrollChange();
+	});
+
+	$PUBLIC_FUN_IMPL('getScrollPos', function(){
+		return m_pos;
+	});
+
+	$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect){
+		if (m_bar_image)
+			m_bar_image.draw(ctx, rect);
+
+		me.$PARENT(UI.XFrame).paintForeground(ctx, rect);
+	});
+
+	$PUBLIC_FUN_IMPL('setVisibility', function(visibility){
+
+		if ((m_visible_state && visibility == SELF.Visibility.VISIBILITY_SHOW) ||
+			(!m_visible_state && visibility != SELF.Visibility.VISIBILITY_SHOW))
+			return;
+
+		m_visible_state = visibility == SELF.Visibility.VISIBILITY_SHOW;
+
+		updateScrollBar();
+	});
+
+	$PUBLIC_FUN_IMPL('setRect', function(rect){
+		if (me.getRect().equals(rect))
+			return;
+
+		me.$PARENT(UI.XFrame).setRect(rect);
+
+		updateScrollBar();
+	});
+
+	$MESSAGE_HANDLER('onMouseDown', function(e){
+
+		var event_manager = me.getEventManager();
+		event_manager.captureMouse(me.$THIS);
+
+		var pt = e.UI_pt;
+
+		if (pt.inRect(m_bar_rect)) {
+			m_mouse_down_pt = pt;
+			m_mouse_down_scroll_pos = m_pos;
+			m_mouse_down = true;
+		} else {
+			var direction = -1;
+			if (m_type == SELF.ScrollType.SCROLL_H && 
+				pt.x >= m_bar_rect.right)
+				direction = 1;
+			else if (m_type == SELF.ScrollType.SCROLL_V &&
+				pt.y >= m_bar_rect.bottom)
+				direction = 1;
+			me.setScrollPos(m_pos + direction * m_view_len);
+		}
 
 		return true;
 	});
 
-	$MESSAGE_HANDLER('onMouseUp', function(e){
+	$MESSAGE_HANDLER('onMouseUp', function(){
 
-		if (!m_mouse_down) return true;
-		m_mouse_down = false;
-		me.getEventManager().releaseCaptureMouse(me.$THIS);
+		var event_manager = me.getEventManager();
+		event_manager.releaseCaptureMouse(me.$THIS);
 
-		if (m_disabled) return true;
+		if (m_mouse_down) m_mouse_down = false;
+		event_manager.getFocus(me.$THIS);
 
-		refreshButtonFace();
+		return true;
+	});
 
-		if (e.UI_pt.inRect(me.parentToChild(me.getRect())))
-			me.throwNotification(
+	$MESSAGE_HANDLER('onMouseMove', function(e){
+		if (!m_mouse_down) return;
+		var offset = 0;
+		var pt = e.UI_pt;
+		if (m_type == SELF.ScrollType.SCROLL_H)
+			offset = pt.x - m_mouse_down_pt.x;
+		else
+			offset = pt.y - m_mouse_down_pt.y;
+
+		if (offset != 0) {
+			if (m_type == SELF.ScrollType.SCROLL_H)
+				me.setScrollPos(m_mouse_down_scroll_pos + 
+					Math.floor(offset * m_content_len / me.getRect().width()));
+			else
+				me.setScrollPos(m_mouse_down_scroll_pos + 
+					Math.floor(offset * m_content_len / me.getRect().height()));
+		}
+
+	});
+
+	$MESSAGE_HANDLER('onMouseWheel', function(e){
+		
+		if (m_type == SELF.ScrollType.SCROLL_H) {
+			me.setScrollPos(m_pos + e.UI_delta * 10);
+		} else {
+			me.setScrollPos(m_pos + e.UI_delta * 10);
+		}
+
+		return true;
+	});
+
+	function notifyScrollChange() {
+		me.throwNotification(
 				{
-					'id' : SELF.EVENT_ID.EVENT_BUTTON_CLICKED,
+					'id' : SELF.NOTIFICATION.NOTIFICATION_SCROLLCHANGED,
+				 	'pos' : m_pos,
 				});
+	}
 
-		return true;
-	});
+	function updateScrollBar() {
+		var adjust_scroll_pos = adjustScrollPos(m_pos);
+		if (adjust_scroll_pos != m_pos) {
+			me.setScrollPos(adjust_scroll_pos);
+			return;
+		}
 
-	$MESSAGE_HANDLER('onMouseLeave', function(){
-		m_mouse_in = false;
-		if (m_disabled) return;
-		refreshButtonFace();
-	});
+		if (!m_visible_state) {
+			me.$PARENT(UI.XFrame).setVisibility(SELF.Visibility.VISIBILITY_HIDE);
+			return;
+		}
 
-	$MESSAGE_HANDLER('onMouseEnter', function(){
-		m_mouse_in = true;
-		if (m_disabled) return;
-		refreshButtonFace();
-	});
+		if (m_view_len == 0) {
+			me.$PARENT(UI.XFrame).setVisibility(SELF.Visibility.VISIBILITY_HIDE);
+			return;
+		}
 
-	function refreshButtonFace() {
-		var background = me.getBackground();
-		if (!background.isImageLoaded()) return;
+		if (m_view_len >= m_content_len) {
+			me.$PARENT(UI.XFrame).setVisibility(SELF.Visibility.VISIBILITY_HIDE);
+			return;
+		}
 
-		var state = m_disabled ? 
-			SELF.BtnState.BTN_DISABLED : SELF.BtnState.BTN_NORMAL;
+		var box_size = me.getRect().size();
+		var bar_size = new UI.Size(
+			m_type == SELF.ScrollType.SCROLL_H ? 
+				Math.floor(box_size.w * m_view_len / m_content_len) : box_size.w,
+			m_type == SELF.ScrollType.SCROLL_V ?
+				Math.floor(box_size.h * m_view_len / m_content_len) : box_size.h);
 
-		if (!m_disabled && m_mouse_in)
-			state = m_mouse_down ? SELF.BtnState.BTN_DOWN : SELF.BtnState.BTN_HOVER;
+		var old_bar_rect = new UI.Rect(m_bar_rect);
 
-		background.setSrcRect(new UI.Rect(
-			new UI.Pt(state * background.getImageWidth() / 4, 0),
-			new UI.Size(background.getImageWidth() / 4, background.getImageHeight())));
+		if (m_type == SELF.ScrollType.SCROLL_H) {
+			m_bar_rect.top = 0;
+			m_bar_rect.bottom = bar_size.h;
+			m_bar_rect.left = Math.floor(m_pos * box_size.w / m_content_len);
+			m_bar_rect.right = m_bar_rect.left + bar_size.w;
+		} else {
+			m_bar_rect.left = 0;
+			m_bar_rect.right = bar_size.w;
+			m_bar_rect.top = Math.floor(m_pos * box_size.h / m_content_len);
+			m_bar_rect.bottom = m_bar_rect.top + bar_size.h;
+		}
 
-		me.invalidateRect();
+		if (m_bar_image) m_bar_image.setDstRect(new UI.Rect(m_bar_rect));
+
+		if (me.getVisibility() == SELF.Visibility.VISIBILITY_SHOW) {
+			me.invalidateRect(old_bar_rect);
+			me.invalidateRect(m_bar_rect);
+		} else {
+			me.$PARENT(UI.XFrame).setVisibility(SELF.Visibility.VISIBILITY_SHOW);
+		}
+	}
+
+	function onBarImageLoaded() {
+		me.invalidateRect(m_bar_rect);
+	}
+
+	function adjustScrollPos(pos) {
+		if (pos > m_content_len - m_view_len)
+			pos = m_content_len - m_view_len;
+		if (pos < 0)
+			pos = 0;
+
+		return pos;
 	}
 
 });
 
-$ENUM('UI.XButton.BtnState', {
-	'BTN_NORMAL' 	: 0,
-	'BTN_HOVER'  	: 1,
-	'BTN_DOWN'	 	: 2,
-	'BTN_DISABLED' 	: 3,
-});
 
-$ENUM('UI.XButton.EVENT_ID', [
-	'EVENT_BUTTON_CLICKED',
+$ENUM('UI.XScrollBar.ScrollType',
+[
+	'SCROLL_H',
+	'SCROLL_V',
 ]);
+
+$ENUM('UI.XScrollBar.NOTIFICATION', 
+[
+	'NOTIFICATION_SCROLLCHANGED',
+]);
+
+
+;
+
+(function(){
+
+	$CLASS('UI.XDock', 
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+
+			'create',
+			'destroy',
+
+			'onMeasureWidth',
+			'onMeasureHeight',
+			'onLayout',
+		]);
+
+		var m_dock_type = SELF.DockType.DOCK_LEFT2RIGHT;
+		var m_align = SELF.DockType.ALIGN_LOW;
+
+		$PUBLIC_FUN_IMPL('create', function(parent, dock_type, align, layout_param, 
+			visibility/* = SELF.Visibility.VISIBILITY_NONE*/) {
+
+			me.$PARENT(UI.XFrame).create(parent, layout_param, visibility);
+
+			m_dock_type = dock_type;
+			m_align = align;
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			me.$PARENT(UI.XFrame).destroy();
+			m_dock_type = SELF.DockType.DOCK_LEFT2RIGHT;
+			m_align = SELF.Align.ALIGN_LOW;
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			var measured = 0;
+			if (m_dock_type == SELF.DockType.DOCK_TOP2BOTTOM ||
+				m_dock_type == SELF.DockType.DOCK_BOTTOM2TOP) {
+				measured = onMeasureAlignDirection(param, 
+					'measureWidth', 'getMeasuredWidth',
+					'margin_left', 'margin_right', 'width');
+			} else {
+				measured = onMeasureLayoutDirection(param, 
+					'measureWidth', 'getMeasuredWidth',
+					'margin_left', 'margin_right', 'width');
+			}
+			me.setMeasuredWidth(measured);
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			var measured = 0;
+			if (m_dock_type == SELF.DockType.DOCK_LEFT2RIGHT ||
+				m_dock_type == SELF.DockType.DOCK_RIGHT2LEFT) {
+				measured = onMeasureAlignDirection(param, 
+					'measureHeight', 'getMeasuredHeight',
+					'margin_top', 'margin_bottom', 'height');
+			} else {
+				measured = onMeasureLayoutDirection(param, 
+					'measureHeight', 'getMeasuredHeight',
+					'margin_top', 'margin_bottom', 'height');
+			}
+			me.setMeasuredHeight(measured);
+		});
+
+		$PUBLIC_FUN_IMPL('onLayout', function(rc) {
+
+			var direction = 0;
+			var current_pos = 0;
+			var layout_direction_start = null,
+				layout_direction_end = null,
+				layout_direction_margin_start = null,
+				layout_direction_margin_end = null,
+				align_direction_low = null,
+				align_direction_high = null,
+				get_layout_direction_size_proc = null,
+				get_align_direction_size_proc = null,
+				align_direction_margin_start = null,
+				align_direction_margin_end = null;
+
+			var align_direction_size = 0;
+
+			switch(m_dock_type) {
+				case SELF.DockType.DOCK_LEFT2RIGHT:
+					direction = 1;
+					current_pos = 0;
+					layout_direction_start = 'left';
+					layout_direction_end = 'right';
+					layout_direction_margin_start = 'margin_left';
+					layout_direction_margin_end = 'margin_right';
+					align_direction_margin_start = 'margin_top';
+					align_direction_margin_end = 'margin_bottom';
+					align_direction_low = 'top';
+					align_direction_high = 'bottom';
+					get_layout_direction_size_proc = 'getMeasuredWidth';
+					get_align_direction_size_proc = 'getMeasuredHeight';
+					align_direction_size = rc.height();
+					break;
+				case SELF.DockType.DOCK_RIGHT2LEFT:
+					direction = -1;
+					current_pos = rc.width();
+					layout_direction_start = 'right';
+					layout_direction_end = 'left';
+					layout_direction_margin_start = 'margin_right';
+					layout_direction_margin_end = 'margin_left';
+					align_direction_margin_start = 'margin_top';
+					align_direction_margin_end = 'margin_bottom';
+					align_direction_low = 'top';
+					align_direction_high = 'bottom';
+					get_layout_direction_size_proc = 'getMeasuredWidth';
+					get_align_direction_size_proc = 'getMeasuredHeight';
+					align_direction_size = rc.height();
+					break;
+				case SELF.DockType.DOCK_TOP2BOTTOM:
+					direction = 1;
+					current_pos = 0;
+					layout_direction_start = 'top';
+					layout_direction_end = 'bottom';
+					layout_direction_margin_start = 'margin_top';
+					layout_direction_margin_end = 'margin_bottom';
+					align_direction_margin_start = 'margin_left';
+					align_direction_margin_end = 'margin_right';
+					align_direction_low = 'left';
+					align_direction_high = 'right';
+					get_layout_direction_size_proc = 'getMeasuredHeight';
+					get_align_direction_size_proc = 'getMeasuredWidth';
+					align_direction_size = rc.width();
+					break;
+				case SELF.DockType.DOCK_BOTTOM2TOP:
+					direction = -1;
+					current_pos = rc.height();
+					layout_direction_start = 'bottom';
+					layout_direction_end = 'top';
+					layout_direction_margin_start = 'margin_bottom';
+					layout_direction_margin_end = 'margin_top';
+					align_direction_margin_start = 'margin_left';
+					align_direction_margin_end = 'margin_right';
+					align_direction_low = 'left';
+					align_direction_high = 'right';
+					get_layout_direction_size_proc = 'getMeasuredHeight';
+					get_align_direction_size_proc = 'getMeasuredWidth';
+					align_direction_size = rc.width();
+					break;
+			}
+
+			var frame_count = me.getFrameCount();
+			for (var i = 0; i < frame_count; i++) {
+				var cur = me.getFrameByIndex(i);
+				var layout_param = cur.getLayoutParam();
+
+				if (cur.getVisibility() == 
+					SELF.Visibility.VISIBILITY_NONE)
+					continue;
+
+				var layout_rect = new UI.Rect();
+				var start = layout_rect[layout_direction_start] = 
+					current_pos + direction * layout_param[layout_direction_margin_start];
+				var end = layout_rect[layout_direction_end] = 
+					start + direction * cur[get_layout_direction_size_proc]();
+				current_pos = end + direction * layout_param[layout_direction_margin_end]; 
+
+				switch (m_align) {
+					case SELF.Align.ALIGN_LOW:
+						var low = 
+							layout_rect[align_direction_low] = layout_param[align_direction_margin_start];
+						layout_rect[align_direction_high] = low + cur[get_align_direction_size_proc]();
+						break;
+					case SELF.Align.ALIGN_MIDDLE:
+						var size = cur[get_align_direction_size_proc]();
+						var size_with_margin = size + 
+							layout_param[align_direction_margin_start] +
+							layout_param[align_direction_margin_end];
+						var low = layout_rect[align_direction_low] = Math.floor((align_direction_size - size_with_margin) / 2)
+							+ layout_param[align_direction_margin_start];
+						layout_rect[align_direction_high] = low + size;
+						break;
+					case SELF.Align.ALIGN_HIGH:
+						var high = layout_rect[align_direction_high] = align_direction_size - 
+							layout_param[align_direction_margin_end];
+						layout_rect[align_direction_low] = high - cur[get_align_direction_size_proc]();
+						break;
+				}
+
+				cur.layout(layout_rect);
+			}
+		});
+
+		function onMeasureAlignDirection(param, 
+			child_measure_proc, child_get_measure_proc,
+			layout_margin_low, layout_margin_high, layout_param_size) {
+
+			var measured_size = 0;
+			var max_size = 0;
+
+			var frame_count = me.getFrameCount();
+			for (var i = 0; i < frame_count; i++) {
+				var cur = me.getFrameByIndex(i);
+				var layout_param = cur.getLayoutParam();
+
+				if (cur.getVisibility() == 
+					SELF.Visibility.VISIBILITY_NONE)
+					continue;
+
+				if (layout_param[layout_param_size] ==
+					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
+					continue;
+
+				var param_for_measure = new SELF.MeasureParam();
+
+				switch (layout_param[layout_param_size]) {
+					case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+						if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST ||
+							param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT) {
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
+							param_for_measure.num = Math.max(0, param.num - 
+								layout_param[layout_margin_low] - layout_param[layout_margin_high]);
+						} else {
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+							param_for_measure.num = 0;
+						}
+						break;
+					default:
+						param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+						param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
+						break;
+				}
+
+				cur[child_measure_proc](param_for_measure);
+
+				max_size = Math.max(max_size,
+					cur[child_get_measure_proc]() +
+					layout_param[layout_margin_low] +
+					layout_param[layout_margin_high]);
+			}
+
+			switch (param.spec) {
+				case SELF.MeasureParam.Spec.MEASURE_EXACT:
+					measured_size = param.num;
+					break;
+				default:
+					measured_size = max_size;
+					if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+						measured_size = Math.min(measured_size, param.num);
+					break;
+			}
+
+			for (var i = 0; i < frame_count; i++) {
+				var cur = me.getFrameByIndex(i);
+				var layout_param = cur.getLayoutParam();
+
+				if (cur.getVisibility() == 
+					SELF.Visibility.VISIBILITY_NONE)
+					continue;
+
+				if (layout_param[layout_param_size] !=
+					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
+					continue;
+
+				var param_for_measure = new SELF.MeasureParam();
+				param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+				param_for_measure.num = Math.max(
+					0, measured_size 
+					- layout_param[layout_margin_low]
+					- layout_param[layout_margin_high]); 
+
+				cur[child_measure_proc](param_for_measure);
+			}
+
+			return measured_size;
+		}
+
+		function onMeasureLayoutDirection(param, 
+			child_measure_proc, child_get_measure_proc,
+			layout_margin_low, layout_margin_high, layout_param_size) {
+
+			var measured_size = 0;
+			var current_pos = 0;
+
+			var frame_count = me.getFrameCount();
+			for (var i = 0; i < frame_count; i++) {
+				var cur = me.getFrameByIndex(i);
+				var layout_param = cur.getLayoutParam();
+
+				if (cur.getVisibility() == 
+					SELF.Visibility.VISIBILITY_NONE)
+					continue;
+
+				var param_for_measure = new SELF.MeasureParam();
+
+				switch (layout_param[layout_param_size]) {
+					case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+						if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST ||
+							param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT) {
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
+							param_for_measure.num = Math.max(0, param.num - current_pos -
+								layout_param[layout_margin_low] - layout_param[layout_margin_high]);
+						} else {
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+							param_for_measure.num = 0;
+						}
+						break;
+					case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
+						param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+						if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT) {
+							param_for_measure.num = max(0, param.num - current_pos -
+								layout_param[layout_margin_low] - layout_param[layout_margin_high]);
+						} else {
+							param_for_measure.num = 0;
+						}
+						break;
+					default:
+						param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+						param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
+						break;
+				}
+
+				cur[child_measure_proc](param_for_measure);
+
+				current_pos = current_pos + cur[child_get_measure_proc]() +
+					layout_param[layout_margin_low] + layout_param[layout_margin_high];
+			}
+
+			switch (param.spec) {
+				case SELF.MeasureParam.Spec.MEASURE_EXACT:
+					measured_size = param.num;
+					break;
+				default:
+					measured_size = current_pos;
+					if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+						measured_size = Math.min(measured_size, param.num);
+					break;
+			}
+
+			return measured_size;
+		}
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+
+	$ENUM('UI.XDock.DockType', [
+		'DOCK_LEFT2RIGHT',
+		'DOCK_TOP2BOTTOM',
+		'DOCK_RIGHT2LEFT',
+		'DOCK_BOTTOM2TOP',
+	]);
+
+	$ENUM('UI.XDock.Align', [
+		'ALIGN_LOW',
+		'ALIGN_MIDDLE',
+		'ALIGN_HIGH',
+	]);
+
+
+	function buildFromXML(xml_node, parent) {
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var dock_type = this.DockType.DOCK_LEFT2RIGHT;
+		var align_type = this.Align.ALIGN_LOW;
+
+		var dock_type_attr = xml_node.getAttribute('dock_type') || '';
+		dock_type_attr = dock_type_attr.toLowerCase();
+		if (dock_type_attr == 'left2right')
+			dock_type = this.DockType.DOCK_LEFT2RIGHT;
+		else if (dock_type_attr == 'right2left')
+			dock_type = this.DockType.DOCK_RIGHT2LEFT;
+		else if (dock_type_attr == 'top2bottom')
+			dock_type = this.DockType.DOCK_TOP2BOTTOM;
+		else if (dock_type_attr == 'bottom2top')
+			dock_type = this.DockType.DOCK_BOTTOM2TOP;
+
+		var align_type_attr = xml_node.getAttribute('align_type') || '';
+		align_type_attr = align_type_attr.toLowerCase();
+		if (align_type_attr == 'low')
+			align_type = this.Align.ALIGN_LOW;
+		else if (align_type_attr == 'middle')
+			align_type = this.Align.ALIGN_MIDDLE;
+		else if (align_type_attr == 'high')
+			align_type = this.Align.ALIGN_HIGH;
+
+		var frame = new this();
+		frame.create(parent, dock_type, align_type, layout_param, 
+			this.Visibility.VISIBILITY_NONE);
+
+		return frame;
+	}
+
+})();
+
+
+;
+
+(function(){
+
+
+	$CLASS('UI.XScrollFrame',
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'addContentFrame',
+			'getContentFrameCount',
+			'removeContentFrame',
+
+			'onMeasureWidth',
+			'onMeasureHeight',
+
+			'onLayout',
+
+			'handleXMLChildNode',
+		]);
+
+		$MESSAGE_MAP('NOTIFICATION', 
+		[
+			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onViewRectChanged'),
+			$MAP(UI.XScrollView.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED, 'onContentRectChanged'),
+			$MAP(UI.XScrollBar.NOTIFICATION.NOTIFICATION_SCROLLCHANGED, 'onScrollChanged'),
+			$CHAIN(UI.XFrame),
+		]);
+
+		var m_scroll_bar;
+		var m_scroll_bar_h = null;
+		var m_scroll_bar_v = null;
+		var m_view = null;
+
+		var m_scroll_h_height = 15;
+		var m_scroll_v_width = 15;
+
+		$CONSTRUCTOR(function(scroll_bar){
+			m_scroll_bar = scroll_bar;
+		});
+
+		$PUBLIC_FUN_IMPL('create', function(
+			parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+			bg_h /* = null*/, fg_h /* = null*/, bg_v /* = null*/, fg_v /* = null */){
+
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H) && !m_scroll_bar_h) {
+				m_scroll_bar_h = new UI.XScrollBar();
+				m_scroll_bar_h.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_H,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_h, fg_h);
+				m_scroll_bar_h.addNotificationListener(me.$THIS);
+			}
+
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V) && !m_scroll_bar_v) {
+				m_scroll_bar_v = new UI.XScrollBar();
+				m_scroll_bar_v.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_V,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_v, fg_v);
+				m_scroll_bar_v.addNotificationListener(me.$THIS);
+			}
+
+			if (!m_view) {
+				m_view = new UI.XScrollView();
+				m_view.create(me.$THIS, me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW);
+				m_view.addNotificationListener(me.$THIS);
+			}
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			m_view = m_scroll_bar_h = m_scroll_bar_v = null;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_view.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+				param_for_measure.num = m_scroll_v_width;
+				m_scroll_bar_v.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_scroll_bar_h.measureWidth(param_for_measure);
+			}
+
+			me.setMeasuredWidth(measured);
+
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_view.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_scroll_bar_v.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = m_scroll_h_height;
+				m_scroll_bar_h.measureHeight(param_for_measure);
+			}
+
+			me.setMeasuredHeight(measured);
+		});
+
+		$PUBLIC_FUN_IMPL('onLayout', function(rc){
+
+			var width = rc.width();
+			var height = rc.height();
+
+			if (m_view)
+				m_view.layout(new UI.Rect(0, 0, 
+					m_view.getMeasuredWidth(), m_view.getMeasuredHeight()));
+			if (m_scroll_bar_v)
+				m_scroll_bar_v.layout(new UI.Rect(
+					width - m_scroll_bar_v.getMeasuredWidth(), 0,
+					width, m_scroll_bar_v.getMeasuredHeight()));
+			if (m_scroll_bar_h)
+				m_scroll_bar_h.layout(new UI.Rect(
+					0, height - m_scroll_bar_h.getMeasuredHeight(),
+					m_scroll_bar_h.getMeasuredWidth(), height));
+
+		});
+
+		$PUBLIC_FUN_IMPL('addContentFrame', function(frame){
+			m_view.addFrame(frame);
+		});
+
+		$PUBLIC_FUN_IMPL('getContentFrameCount', function(){
+			return m_view.getFrameCount();
+		});
+
+		$PUBLIC_FUN_IMPL('removeContentFrame', function(index){
+			return m_view.removeFrame(index);
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node) {
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+				UI.XFrameXMLFactory.instance().buildFrame(c, m_view);
+			}
+		});
+
+		$MESSAGE_HANDLER('onViewRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
+				n.old.width(), n.old.height());
+		});
+
+		$MESSAGE_HANDLER('onContentRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
+				n.old.max_x, n.old.max_y);
+		});
+
+		$MESSAGE_HANDLER('onScrollChanged', function(n){
+			if (n.src == m_scroll_bar_h) {
+				m_view.setScrollX(n.pos);
+			}
+
+			if (n.src == m_scroll_bar_v) {
+				m_view.setScrollY(n.pos);
+			}
+
+		})
+
+		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
+			if (m_scroll_bar_v && old_h != h)
+				m_scroll_bar_v[fn](h);
+			if (m_scroll_bar_h && old_w != w)
+				m_scroll_bar_h[fn](w);
+		}
+	
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	$ENUM('UI.XScrollFrame.ScrollBar', {
+		'SCROLL_BAR_H' : 1,
+		'SCROLL_BAR_V' : 2,
+	});
+
+	function buildFromXML(xml_node, parent) {
+
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var scroll_bar = 0;
+		var bar_bg_h = null;
+		var bar_fg_h = null;
+		var bar_bg_v = null;
+		var bar_fg_v = null;
+
+		if ((xml_node.getAttribute('h_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_H;
+		if ((xml_node.getAttribute('v_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_V;
+
+		if (!scroll_bar) {
+			UI.XFrameXMLFactory
+				.reportError('WARNING: No scroll bar specified for the scroll frame. Create the scroll frame failed. ');
+			return null;
+		}
+
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_H) {
+			bar_bg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_bg", null, "3partH", "scroll_bar_h_bg_part_");
+			bar_fg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_fg", null, "3partH", "scroll_bar_h_fg_part_");
+		}
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_V) {
+			bar_bg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_bg", null, "3partV", "scroll_bar_v_bg_part_");
+			bar_fg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_fg", null, "3partV", "scroll_bar_v_fg_part_");
+		}
+
+		var frame = new this(scroll_bar);
+		frame.create(parent, layout_param, 
+			UI.XFrame.Visibility.VISIBILITY_NONE,
+			bar_bg_h, bar_fg_h, bar_bg_v, bar_fg_v);
+
+		return frame;
+
+	}
+
+
+
+})();

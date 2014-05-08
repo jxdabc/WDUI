@@ -1,6 +1,6 @@
 ;
 
-$CLASS('UI.Pt', function(me){
+$STRUCT('UI.Pt', function(SELF){
 
 	$PUBLIC_VAR({
 		'x' : 0,
@@ -23,24 +23,24 @@ $CLASS('UI.Pt', function(me){
 
 		if (x.instanceOf && x.instanceOf(UI.Pt)) {
 			var pt = x;
-			me.x = pt.x;
-			me.y = pt.y;
+			this.x = pt.x;
+			this.y = pt.y;
 			return;
 		}
 
-		me.x = x;
-		me.y = y;
+		this.x = x;
+		this.y = y;
 	});
 
 	$PUBLIC_FUN_IMPL('inRect', function(rc){
-		return me.x >= rc.left &&
-			me.x < rc.right &&
-			me.y >= rc.top &&
-			me.y < rc.bottom;
+		return this.x >= rc.left &&
+			this.x < rc.right &&
+			this.y >= rc.top &&
+			this.y < rc.bottom;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function(){
-		return 'x:%, y:%'.format(me.x, me.y);
+		return 'x:%, y:%'.format(this.x, this.y);
 	});
 
 });

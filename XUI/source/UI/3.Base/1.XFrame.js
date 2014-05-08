@@ -2,7 +2,7 @@
 
 (function(){
 	$CLASS('UI.XFrame', 
-	$EXTENDS(UI.IXNotificationLister),
+	$EXTENDS(UI.IXNotificationListener),
 	function(me, SELF){
 
 		$PUBLIC_FUN([
@@ -41,6 +41,11 @@
 			'getRect',
 			'setRect',
 
+			'setScrollX',
+			'setScrollY',
+			'getScrollX',
+			'getScrollY',
+
 			'generateLayoutParam',
 			'beginUpdateLayoutParam',
 			'endUpdateLayoutParam',
@@ -63,6 +68,7 @@
 			'addFrame',
 			'insertFrame',
 			'removeFrame',
+			'getFrameCount',
 			'getFrameByIndex',
 			'setParent',
 			'getParent',
@@ -140,6 +146,9 @@
 
 		var m_active = false;
 
+		var m_scrollX = 0;
+		var m_scrollY = 0;
+
 
 		$PUBLIC_FUN_IMPL('setName', function(name){
 			m_name = name;
@@ -149,7 +158,7 @@
 			return m_name;
 		});
 
-		$PUBLIC_FUN_IMPL('getFrameByName', function(){
+		$PUBLIC_FUN_IMPL('getFrameByName', function(name){
 			if (m_name == name) return me;
 
 			for (var i = 0; i < m_child_frames.length; i++) {
@@ -320,6 +329,33 @@
 				});
 		});
 
+		$PUBLIC_FUN_IMPL('setScrollX', function(x){
+
+			if (m_scrollX == x)
+				return;
+
+			updateScroll(x - m_scrollX, 0);
+
+			m_scrollX = x;
+		});
+
+		$PUBLIC_FUN_IMPL('setScrollY', function(y){
+			if (m_scrollY == y)
+				return;
+
+			updateScroll(0, y - m_scrollY);
+
+			m_scrollY = y;
+		});
+
+		$PUBLIC_FUN_IMPL('getScrollX', function(){
+			return m_scrollX;
+		});
+
+		$PUBLIC_FUN_IMPL('getScrollY', function(){
+			return m_scrollY;
+		});
+
 		$PUBLIC_FUN_IMPL('setBackground', function(background){
 			if (m_background == background)
 				return null;
@@ -330,7 +366,7 @@
 
 			if (m_background) {
 				m_background.setDstRect(
-					new UI.Rect(0,0,m_rect.width(), m_rect.height));
+					new UI.Rect(0,0,m_rect.width(), m_rect.height()));
 				m_background.onImageLoaded(me.onBackgroundLoaded);
 			}
 
@@ -506,11 +542,13 @@
 
 			// overload invalidateRect(). 
 			if (typeof rc == 'undefined') {
-				me.invalidateRect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
+				rc = new UI.Rect(0, 0, m_rect.width(), m_rect.height());
+				me.invalidateRect(rc);
 				return;
 			}
 
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW) return;
+
 			if (rc.isEmpty()) return;
 
 			var rect_real = rc.intersect(new UI.Rect(0, 0, m_rect.width(), m_rect.height()));
@@ -554,11 +592,13 @@
 			if (typeof index_or_frame != "number") {
 				var frame = index_or_frame;
 				var index = m_child_frames.indexOf(frame);
-				me.removeFrame(index);
-				return;
+				if (index == -1) return null;
+				return me.removeFrame(index);
 			}
 
 			var index = index_or_frame;
+			if (index >= m_child_frames.length) return null;
+
 			var frame = m_child_frames[index];
 
 			m_child_frames.splice(index, 1);
@@ -580,6 +620,10 @@
 				return null;
 
 			return m_child_frames[i];
+		});
+
+		$PUBLIC_FUN_IMPL('getFrameCount', function(){
+			return m_child_frames.length;
 		});
 
 		$PUBLIC_FUN_IMPL('setParent', function (parent){
@@ -605,8 +649,10 @@
 		$PUBLIC_FUN_IMPL('paintUI', function(ctx, rect){
 			if (m_visibility != SELF.Visibility.VISIBILITY_SHOW)
 				return;
+
 			me.paintBackground(ctx, rect);
 			me.paintForeground(ctx, rect);
+
 		});
 
 		$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
@@ -641,6 +687,7 @@
 				if (rect_paint.isEmpty()) continue;
 
 				ctx.save();
+
 				ctx.beginPath();
 
 				ctx.rect(rect_paint.left, rect_paint.top,
@@ -680,6 +727,8 @@
 
 		$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
 
+			notification.src = me.$THIS;
+
 			var notification_listeners = m_notification_listener;
 
 			for (var i = 0; i < notification_listeners.length; /*no i++*/) {
@@ -696,6 +745,7 @@
 		$PUBLIC_FUN_IMPL('genRemoteRef', function(){
 			var ref = {'obj' : me.$THIS};
 			m_remote_ref.push(ref);
+			return ref;
 		});
 
 		$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
@@ -786,6 +836,7 @@
 
 
 		$PUBLIC_FUN_IMPL('childToParent', function(pt_or_rect){
+
 			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
 				var pt = pt_or_rect;
 				return new UI.Pt(pt.x + m_rect.left, pt.y + m_rect.top);
@@ -800,6 +851,7 @@
 		});
 
 		$PUBLIC_FUN_IMPL('parentToChild', function(pt_or_rect){
+
 			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Pt)) {
 				var pt = pt_or_rect;
 				return new UI.Pt(pt.x - m_rect.left, pt.y - m_rect.top);
@@ -876,6 +928,11 @@
 
 		$PUBLIC_FUN_IMPL('layout', function(rc){
 
+			if (m_parent) {
+				rc = new UI.Rect(rc);
+				rc.offset(-m_parent.getScrollX(), -m_parent.getScrollY());
+			}	
+
 			if (!m_rect.equals(rc) || m_layout_invalid) {
 				m_layout_invalid = false;
 				me.onLayout(rc);
@@ -895,13 +952,13 @@
 
 		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
 			m_measured_width = 
-				onMeasureLayoutDirect(param, 
+				onMeasureLayoutDirection(param, 
 					'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
 		});
 
 		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
 			m_measured_height =
-				onMeasureLayoutDirect(param,
+				onMeasureLayoutDirection(param,
 					'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
 		});
 
@@ -982,7 +1039,7 @@
 		});
 
 
-		function onMeasureLayoutDirect(param, child_measure_proc, child_get_measured_proc,
+		function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
 			layout_param_pos, layout_param_size, layout_margin_end) {
 
 			var measured_size = 0;
@@ -1008,8 +1065,8 @@
 							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_ATMOST;
 							param_for_measure.num = Math.max(0, param.num - layout_param[layout_param_pos]);
 						} else {
-							param.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
-							param.num = 0;
+							param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+							param_for_measure.num = 0;
 						}
 						break;
 					default:
@@ -1074,6 +1131,15 @@
 		function fillSelectedLayer() {
 			if (m_selected_layer) return;
 			me.setSelectedLayer(UI.XResourceMgr.getImage('img/layer/selected.9.png'));
+		}
+
+		function updateScroll(offset_x, offset_y) {
+			for (var i = 0; i < m_child_frames.length; i++) {
+				var c = m_child_frames[i];
+				var frame_rect = new UI.Rect(c.getRect());
+				frame_rect.offset(-offset_x, -offset_y);
+				c.setRect(frame_rect);
+			}
 		}
 
 	}).
@@ -1161,7 +1227,6 @@
 
 			return v - 0 || 0;
 		}
-
 	});
 
 	$ENUM('UI.XFrame.LayoutParam.SpecialMetrics', 
@@ -1170,11 +1235,15 @@
 		'METRIC_WRAP_CONTENT'
 	]);
 
-	$CLASS('UI.XFrame.MeasureParam', function(me, SELF){
+	$STRUCT('UI.XFrame.MeasureParam', function(SELF){
 
 		$PUBLIC_VAR({
-			'spec' 	: SELF.Spec.MEASURE_UNRESTRICTED,
+			'spec' 	: null,
 			'num'	: 0
+		});
+
+		$CONSTRUCTOR(function(){
+			this.spec = SELF.Spec.MEASURE_UNRESTRICTED;
 		});
 
 		$PUBLIC_FUN([
@@ -1184,17 +1253,17 @@
 		]);
 
 		$PUBLIC_FUN_IMPL('reset', function(){
-			me.spec =  SELF.Spec.MEASURE_UNRESTRICTED,
-			me.num = 0;
+			this.spec =  SELF.Spec.MEASURE_UNRESTRICTED,
+			this.num = 0;
 		});
 
 		$PUBLIC_FUN_IMPL('equals', function(other){
-			return me.spec == other.spec &&
-				me.num == other.num;
+			return this.spec == other.spec &&
+				this.num == other.num;
 		});
 
 		$PUBLIC_FUN_IMPL('notequals', function(other){
-			return !me.equals(other);
+			return !this.equals(other);
 		});
 	});
 

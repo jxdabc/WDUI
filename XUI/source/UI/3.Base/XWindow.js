@@ -353,7 +353,7 @@
 
 		var frame = new this();
 		frame.create(container, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE);
+			this.Visibility.VISIBILITY_NONE);
 
 		return frame;
 	}

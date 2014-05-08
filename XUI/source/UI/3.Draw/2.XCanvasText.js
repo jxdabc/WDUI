@@ -26,7 +26,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	var m_bold = false;
 	var m_italic = false;
 
-	var m_line_height = 13 * m_line_height_mutiplier;
+	var m_line_height = Math.round(13 * m_line_height_mutiplier);
 
 	var m_measure_canvas = null;
 
@@ -59,10 +59,11 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			ctx.restore();
 			return;
 		}
+
 			
 
 		var y_start = getYStart(valign, lines.length, rect.height());
-		var y_current = y_start + (m_line_height - m_font_size) / 2;
+		var y_current = y_start + Math.floor((m_line_height - m_font_size) / 2);
 		for (var i = 0; i < lines.length; i++) {
 			var c = lines[i];
 			var x_current = getXStart(halign, c.width, rect.width());
@@ -76,11 +77,12 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	});
 
 	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
+		face = normalFontFace(face);
 		m_font_face = face;
 	});
 	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
 		m_font_size = size - 0;
-		m_line_height = size * m_line_height_mutiplier;
+		m_line_height = Math.round(size * m_line_height_mutiplier);
 	});
 
 	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
@@ -198,7 +200,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		var max_x = 0, max_y = 0;
 
 		max_x = rect.width();
-		max_y = Math.ceil(lines.length * m_line_height);
+		max_y = lines.length * m_line_height;
 
 		var temp_canvas = document.createElement('canvas');
 		temp_canvas.width = max_x;
@@ -231,9 +233,20 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			if (top_found && bottom_found) break;
 		}
 
-		ctx.drawImage(temp_canvas, rect.left, rect.top - rect_bound.top + Math.floor((rect.height() - rect_bound.height()) / 2));
+		ctx.drawImage(temp_canvas, 
+			rect.left, rect.top - rect_bound.top + Math.floor((rect.height() - rect_bound.height()) / 2));
+	}
 
-		console.log( rect.height() - rect_bound.height() );
+	function normalFontFace (face) {
+		var face = face.split(/,/);
+		$.each(face, function(i,v){
+			var normal_value = $.trim(v);
+			if (normal_value.indexOf(' ') != -1)
+				normal_value = '\'' + normal_value + '\'';
+			face[i] = normal_value;
+		});
+		face = face.join(',');
+		return face;
 	}
 
 	
