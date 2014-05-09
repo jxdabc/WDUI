@@ -28,9 +28,11 @@
 		});
 
 		$PUBLIC_FUN_IMPL('setTimer', function(frame, elapse) {
-			return setInterval(function(){
-				frame.$DISPATCH_MESSAGE('EVENT', {'id' : UI.EVENT_ID.EVENT_TIMER});
+			var timer_id = setInterval(function(){
+				frame.$DISPATCH_MESSAGE('EVENT', 
+					{'id' : UI.EVENT_ID.EVENT_TIMER, 'timer_id' : timer_id});
 			}, elapse);
+			return timer_id;
 		});
 
 		$PUBLIC_FUN_IMPL('killTimer', function(id) {

@@ -31,6 +31,12 @@
 			$CHAIN(UI.XFrame),
 		]);
 
+		$MESSAGE_MAP('EVENT', 
+		[
+			$MAP('mouseup', 'onMouseUp'),
+			$CHAIN(UI.XFrame),
+		]);
+
 		var m_scroll_bar;
 		var m_scroll_bar_h = null;
 		var m_scroll_bar_v = null;
@@ -202,7 +208,16 @@
 				m_view.setScrollY(n.pos);
 			}
 
-		})
+		});
+
+		$MESSAGE_HANDLER('onMouseUp', function(e){
+			if (m_scroll_bar_v && 
+				m_scroll_bar_v.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_v.getFocus();
+			else if (m_scroll_bar_h && 
+				m_scroll_bar_h.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_h.getFocus();
+		});
 
 		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
 			if (m_scroll_bar_v && old_h != h)
@@ -210,6 +225,7 @@
 			if (m_scroll_bar_h && old_w != w)
 				m_scroll_bar_h[fn](w);
 		}
+
 	
 	})
 	.$STATIC({

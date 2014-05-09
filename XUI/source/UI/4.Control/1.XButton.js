@@ -79,7 +79,7 @@
 			var wrap_size = 0;
 			var background = me.getBackground();
 			if (background && background.isImageLoaded())
-				wrap_size = background.getImageWidth() / 4;
+				wrap_size = Math.floor(background.getImageWidth() / 4);
 
 			if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
 				wrap_size = Math.min(wrap_size, param.num);

@@ -75,6 +75,8 @@
 			'onDetachedFromParent',
 			'onAttachedToParent',
 
+			'getFocus',
+
 			'paintUI',
 			'paintBackground',
 			'paintForeground',
@@ -644,6 +646,10 @@
 					'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_ATTACHED_TO_PARENT,
 					'parent' : parent
 				});
+		});
+
+		$PUBLIC_FUN_IMPL('getFocus', function(){
+			me.getEventManager().getFocus(me.$THIS);
 		});
 
 		$PUBLIC_FUN_IMPL('paintUI', function(ctx, rect){
