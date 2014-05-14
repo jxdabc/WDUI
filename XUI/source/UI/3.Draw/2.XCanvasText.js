@@ -51,6 +51,8 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		if (!lines)
 			lines = stringToLines(string, rect.width(), ctx);
 
+		adaptLinesToBorder(ctx, lines, rect.width(), rect.height());
+
 		// TODO: When centering texts vertically, canvas will put the texts a little higher, 
 		// so we'll handle vertically centering ourselves by detecting each pixel on the
 		// text that is rendered.
@@ -60,7 +62,6 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			return;
 		}
 
-			
 
 		var y_start = getYStart(valign, lines.length, rect.height());
 		var y_current = y_start + Math.floor((m_line_height - m_font_size) / 2);
@@ -249,7 +250,27 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		return face;
 	}
 
-	
+	function adaptLinesToBorder(ctx, lines, max_x, max_y) {
+
+		var max_line_num = Math.floor(max_y / m_line_height) || 1;
+		if (max_line_num >= lines.length)
+			return;
+
+		lines.length = max_line_num;
+
+		var last_line_words = stringToWordArray(lines.last().text);
+		last_line_words.push('...');
+
+		var last_line_width;
+		while (last_line_words.length > 1 
+			&& (last_line_width = ctx.measureText(last_line_words.join('')).width) > max_x) {
+			last_line_words.length = last_line_words.length - 2;
+			last_line_words.push('...');
+		}
+
+		lines[lines.length - 1].text = last_line_words.join('');
+		lines[lines.length - 1].width = last_line_width;
+	}	
 });
 
 $ENUM('UI.XCanvasText.Align',

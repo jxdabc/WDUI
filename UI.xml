@@ -31,12 +31,12 @@
     </XFrame>
   </XScrollFrame>
   <XScrollFrame margin_bottom="35" left="150" top="190" width="270" height="reach_parent" h_scroll="true" v_scroll="true">
-    <XTree width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="unfolded" child_item_indent="20">
+    <XTree name="T1" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="unfolded" child_item_indent="20">
       <XStatic margin_top="5" width="160" height="20" text="Computer Science" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
-      <XTree margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
+      <XTree name="T2" margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
         <XStatic margin_top="5" width="160" height="20" text="Artificial Intelligence" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
         <XStatic margin_top="5" width="160" height="20" text="Machine Learning" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
-        <XTree margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
+        <XTree name="T3" margin_top="5" width="wrap_content" height="wrap_content" folded_button="@img/ctrl/folded_button.png" unfolded_button="@img/ctrl/unfolded_button.png" start_state="folded" child_item_indent="20">
           <XStatic margin_top="5" width="160" height="20" text="NLP" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
           <XStatic margin_top="5" width="160" height="20" text="Speech Input &amp; Output" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>
           <XStatic margin_top="5" width="160" height="20" text="Natural Language Understanding" text_align_v="middle" text_align_h="left" font_size="14"></XStatic>

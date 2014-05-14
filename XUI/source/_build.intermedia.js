@@ -11175,6 +11175,7 @@ $STRUCT('UI.Pt', function(SELF){
 	$PUBLIC_FUN([
 		'inRect',
 		'toString',
+		'equals',
 	]);
 
 
@@ -11195,6 +11196,10 @@ $STRUCT('UI.Pt', function(SELF){
 
 		this.x = x;
 		this.y = y;
+	});
+
+	$PUBLIC_FUN_IMPL('equals', function(other) {
+		return this.x == other.x && this.y == other.y;
 	});
 
 	$PUBLIC_FUN_IMPL('inRect', function(rc){
@@ -11321,8 +11326,10 @@ function(me,SELF){
 			'invalidateRect',
 			'invalidateAfterLayout',
 
+			'getVCenter',
 			'getRect',
 			'setRect',
+
 
 			'setScrollX',
 			'setScrollY',
@@ -11554,7 +11561,7 @@ function(me,SELF){
 
 				m_delay_update_layout_param_scheduled = true;
 
-				UI.XMessageService.instance().
+				UI.XEventService.instance().
 					postFrameEvent(me.$THIS, {'id' :UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT});
 
 				return 'delayed';
@@ -11575,6 +11582,10 @@ function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('generateLayoutParam', function(copy_from_or_xml_or_null){
 				return new SELF.LayoutParam(copy_from_or_xml_or_null);
+		});
+
+		$PUBLIC_FUN_IMPL('getVCenter', function(){
+			return Math.floor(me.getRect().height() / 2);
 		});
 
 		$PUBLIC_FUN_IMPL('getRect', function(){
@@ -12268,10 +12279,10 @@ function(me,SELF){
 		});
 
 		$MESSAGE_HANDLER('onDelayupdateLayout', function(){
-			if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
+			if (!m_delay_update_layout_param_scheduled || !m_delay_layout_param)
 				return;
 
-			m_delay_update_layout_param_schedule = false;
+			m_delay_update_layout_param_scheduled = false;
 
 			m_layout_param = m_delay_layout_param;
 			m_delay_layout_param = null;
@@ -14345,6 +14356,8 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		if (!lines)
 			lines = stringToLines(string, rect.width(), ctx);
 
+		adaptLinesToBorder(ctx, lines, rect.width(), rect.height());
+
 		// TODO: When centering texts vertically, canvas will put the texts a little higher, 
 		// so we'll handle vertically centering ourselves by detecting each pixel on the
 		// text that is rendered.
@@ -14354,7 +14367,6 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			return;
 		}
 
-			
 
 		var y_start = getYStart(valign, lines.length, rect.height());
 		var y_current = y_start + Math.floor((m_line_height - m_font_size) / 2);
@@ -14543,7 +14555,27 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		return face;
 	}
 
-	
+	function adaptLinesToBorder(ctx, lines, max_x, max_y) {
+
+		var max_line_num = Math.floor(max_y / m_line_height) || 1;
+		if (max_line_num >= lines.length)
+			return;
+
+		lines.length = max_line_num;
+
+		var last_line_words = stringToWordArray(lines.last().text);
+		last_line_words.push('...');
+
+		var last_line_width;
+		while (last_line_words.length > 1 
+			&& (last_line_width = ctx.measureText(last_line_words.join('')).width) > max_x) {
+			last_line_words.length = last_line_words.length - 2;
+			last_line_words.push('...');
+		}
+
+		lines[lines.length - 1].text = last_line_words.join('');
+		lines[lines.length - 1].width = last_line_width;
+	}	
 });
 
 $ENUM('UI.XCanvasText.Align',
@@ -14642,6 +14674,89 @@ $CLASS('UI.XCanvasImage', function(me){
 	});
 
 });
+;
+
+(function(){
+
+	$CLASS('UI.XLine', function(me, SELF){})
+	.$STATIC({
+		'draw' : draw,
+	});
+
+
+	var DOTTED_LEN = 5;
+	function draw(ctx, start, end, width, r,g,b, dotted) {
+		
+		if (start.equals(end)) return;
+
+		ctx.save();
+
+		ctx.strokeStyle = '#' + r.toString(16) + g.toString(16) + b.toString(16);
+		ctx.lineWidth = width;
+
+		if (dotted) {
+			if (start.x > end.x) {var t = start; start = end; end = t;}
+			var k = (end.y - start.y) / (end.x - start.x);
+			
+			// parameter equation
+			// x = mt + start.x (m = 1 / sqrt(k^2 + 1) )
+			// y = nt + start.y (n = k / sqrt(k^2 + 1) )
+			// t is the length of the segment start from (start.x, start.y)
+
+			var m,n;
+			m = 1 / Math.sqrt(k * k + 1);
+			if (Number.isFinite(k))
+				n = k / Math.sqrt(k * k + 1);
+			else
+				n = k > 0 ? 1 : -1;
+
+			var delta_x = end.x - start.x;
+			var delta_y = end.y - start.y;
+
+			var ops = ['lineTo', 'moveTo'];
+			var op = 0, current_end = DOTTED_LEN;
+			ctx.beginPath();
+			ctx.moveTo(start.x, start.y);
+
+			do {
+				var current_end_x = m * current_end + start.x;
+				var cureent_end_y = n * current_end + start.y;
+
+				if (current_end_x > end.x ||
+					(n > 0 && cureent_end_y > end.y) ||
+					(n < 0 && cureent_end_y < end.y)) {
+					current_end_x = end.x;
+					cureent_end_y = end.y;
+				}
+
+				console.log(ops[op], current_end_x, cureent_end_y);
+
+				ctx[ops[op]](current_end_x, cureent_end_y);
+
+				current_end += DOTTED_LEN;
+				op = 1 - op;
+					
+			} while(current_end_x != end.x || 
+				cureent_end_y != end.y);
+
+			ctx.stroke();
+
+
+		} else {
+			ctx.beginPath();
+			ctx.moveTo(start.x, start.y);
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+		}
+
+	
+		ctx.restore();
+	}
+
+
+})();
+
+
 ;
 
 
@@ -14950,554 +15065,6 @@ $CLASS('UI.XCanvasImage', function(me){
 		return frame;
 
 	}
-
-
-})();
-;
-
-$CLASS('UI.XScrollView',
-$EXTENDS(UI.XFrame),
-function(me, SELF) {
-
-	$PUBLIC_FUN([
-		'onMeasureWidth',
-		'onMeasureHeight',
-
-		'onLayout',
-
-		'destroy', 
-	]);
-
-	var m_max_x = 0;
-	var m_max_y = 0;
-
-	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-		var measured_width = 
-			onMeasureLayoutDirection(param, 
-				'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
-		me.setMeasuredWidth(measured_width);
-	});
-
-	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-		var measured_height =
-			onMeasureLayoutDirection(param,
-				'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
-		me.setMeasuredHeight(measured_height);
-	});
-
-	$PUBLIC_FUN_IMPL('onLayout', function(param){
-
-		var max_x = 0, max_y = 0;
-
-		var frame_count = me.getFrameCount();
-		for (var i = 0; i < frame_count; i++) {
-			var cur = me.getFrameByIndex(i);
-			var layout_param = cur.getLayoutParam();
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
-				continue;
-
-			var rect = new UI.Rect(layout_param.x, layout_param.y,
-				layout_param.x + cur.getMeasuredWidth(),
-				layout_param.y + cur.getMeasuredHeight());
-
-			max_x = Math.max(max_x, rect.right);
-			max_y = Math.max(max_y, rect.bottom);
-
-			cur.layout(rect);
-		}
-
-		handleMaxXY(max_x, max_y);
-	});
-
-	$PUBLIC_FUN_IMPL('destroy', function(){
-		me.$PARENT(UI.XFrame).destroy();
-		m_max_x = m_max_y = 0;
-	});
-
-	function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
-			layout_param_pos, layout_param_size, layout_margin_end) {
-
-		var measured = 0;
-		if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-			measured = param.num;
-
-		var frame_count = me.getFrameCount();
-		for (var i = 0; i < frame_count; i++) {
-			var cur = me.getFrameByIndex(i);
-
-			var layout_param = cur.getLayoutParam();
-
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
-				continue;
-
-			var param_for_measure = new SELF.MeasureParam();
-
-			switch (layout_param[layout_param_size]) {
-				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
-					param_for_measure.num = 0;
-					break;
-				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = max(0, 
-						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
-					break;
-				default:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
-					break;
-			}
-
-			cur[child_measure_proc](param_for_measure);
-		}
-
-		return measured;
-	}
-
-	function handleMaxXY(max_x, max_y) {
-		if (m_max_x == max_x &&
-			m_max_y == max_y)
-			return;
-
-		var old = {max_x: m_max_x, max_y: m_max_y};
-		m_max_x = max_x;
-		m_max_y = max_y;
-
-		me.throwNotification(
-			{
-				'id' : SELF.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED,
-				new : {
-					'max_x' : m_max_x,
-					'max_y' : m_max_y,
-				},
-				old : old
-			});
-	}
-});
-
-$ENUM('UI.XScrollView.NOTIFICATION', [
-	'NOTIFICAITON_BOUND_CHANGED',
-]);
-;
-
-(function() {
-
-	$CLASS('UI.XStatic', 
-	$EXTENDS(UI.XFrame),
-	function(me, SELF){
-
-		$PUBLIC_FUN([
-			'create',
-			'destroy',
-
-			'setRect',
-			'paintForeground',
-			
-			'onMeasureWidth',
-			'onMeasureHeight',
-
-			'setText',
-			'getText',
-		]);
-
-		var m_text = null;
-		var m_measured_height = 0;
-
-
-		$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/, 
-			text) {
-			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
-			me.setText(text);
-		});
-
-		$PUBLIC_FUN_IMPL('destroy', function(){
-			me.setText(null);
-			m_measured_height = -1;
-			me.$PARENT(UI.XFrame).destroy();
-		});
-
-		$PUBLIC_FUN_IMPL('setRect', function(new_rect){
-			if (me.getRect().equals(new_rect)) return;
-			if (m_text)
-				m_text.setDstRect(new UI.Rect(0,0,new_rect.width(), new_rect.height()));
-			me.$PARENT(UI.XFrame).setRect(new_rect);
-		});
-
-		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect){
-			if (m_text) m_text.draw(ctx, rect);
-			me.$PARENT(UI.XFrame).paintForeground(ctx, rect);
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-			me.$PARENT(UI.XFrame).onMeasureWidth(param);
-
-			if (!m_text) return;
-
-			var measured = me.getMeasuredWidth();
-			var text_metric;
-
-			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
-				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
-					text_metric = m_text.measure(param.num);
-				else
-					text_metric = m_text.measure(UI.IXText.UNLIMITED);
-
-				var new_measured = Math.max(measured, text_metric.w);
-				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
-					new_measured = Math.min(new_measured, param.num);
-
-				me.setMeasuredWidth(new_measured);
-
-			} else
-				text_metric = m_text.measure(measured);
-
-			m_measured_height = text_metric.h;
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-			me.$PARENT(UI.XFrame).onMeasureHeight(param);
-
-			if (!m_text) return;
-
-			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
-				var measured = me.getMeasuredHeight();
-				var new_measured = Math.max(measured, m_measured_height);
-
-				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
-					new_measured = Math.min(param.num, new_measured);
-
-				me.setMeasuredHeight(new_measured);
-			}
-
-			m_measured_height = 0;
-
-		});
-
-		$PUBLIC_FUN_IMPL('setText', function(text){
-			
-			if (m_text == text) return null;
-
-			var old = m_text;
-			m_text = text;
-
-			if (m_text) {
-				var frame_rect = me.getRect();
-				m_text.setDstRect(new UI.Rect(0,0,frame_rect.width(), frame_rect.height()));
-			}
-
-			me.invalidateLayout();
-			me.invalidateAfterLayout();
-
-			return old;
-		});
-
-		$PUBLIC_FUN_IMPL('getText', function(){
-			if (!m_text) return '';
-			return m_text.getText();
-		});
-
-	})
-	.$STATIC({
-		'buildFromXML' : buildFromXML,
-	});
-
-	function buildFromXML(xml_node, parent) {
-		var layout_param = parent ?
-			parent.generateLayoutParam(xml_node) :
-			new UI.XFrame.LayoutParam(xml_node);
-
-		var text = UI.XFrameXMLFactory.buildText(xml_node);
-
-		var frame = new this();
-		frame.create(parent, layout_param, 
-			this.Visibility.VISIBILITY_NONE, text);
-
-		return frame;
-	}
-
-})();
-;
-
-(function(){
-
-
-	$CLASS('UI.XScrollFrame',
-	$EXTENDS(UI.XFrame),
-	function(me, SELF){
-
-		$PUBLIC_FUN([
-			'create',
-			'destroy',
-
-			'addContentFrame',
-			'getContentFrameCount',
-			'removeContentFrame',
-
-			'onMeasureWidth',
-			'onMeasureHeight',
-
-			'onLayout',
-
-			'handleXMLChildNode',
-		]);
-
-		$MESSAGE_MAP('NOTIFICATION', 
-		[
-			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onViewRectChanged'),
-			$MAP(UI.XScrollView.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED, 'onContentRectChanged'),
-			$MAP(UI.XScrollBar.NOTIFICATION.NOTIFICATION_SCROLLCHANGED, 'onScrollChanged'),
-			$CHAIN(UI.XFrame),
-		]);
-
-		$MESSAGE_MAP('EVENT', 
-		[
-			$MAP('mouseup', 'onMouseUp'),
-			$CHAIN(UI.XFrame),
-		]);
-
-		var m_scroll_bar;
-		var m_scroll_bar_h = null;
-		var m_scroll_bar_v = null;
-		var m_view = null;
-
-		var m_scroll_h_height = 15;
-		var m_scroll_v_width = 15;
-
-		$CONSTRUCTOR(function(scroll_bar){
-			m_scroll_bar = scroll_bar;
-		});
-
-		$PUBLIC_FUN_IMPL('create', function(
-			parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
-			bg_h /* = null*/, fg_h /* = null*/, bg_v /* = null*/, fg_v /* = null */){
-
-			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
-
-			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H) && !m_scroll_bar_h) {
-				m_scroll_bar_h = new UI.XScrollBar();
-				m_scroll_bar_h.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_H,
-					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_h, fg_h);
-				m_scroll_bar_h.addNotificationListener(me.$THIS);
-			}
-
-			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V) && !m_scroll_bar_v) {
-				m_scroll_bar_v = new UI.XScrollBar();
-				m_scroll_bar_v.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_V,
-					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_v, fg_v);
-				m_scroll_bar_v.addNotificationListener(me.$THIS);
-			}
-
-			if (!m_view) {
-				m_view = new UI.XScrollView();
-				m_view.create(me.$THIS, me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW);
-				m_view.addNotificationListener(me.$THIS);
-			}
-		});
-
-		$PUBLIC_FUN_IMPL('destroy', function(){
-			m_view = m_scroll_bar_h = m_scroll_bar_v = null;
-			me.$PARENT(UI.XFrame).destroy();
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-			var measured = 0;
-			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-				measured = param.num;
-
-			var param_for_measure = new SELF.MeasureParam();
-			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-
-			if (m_view) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_v_width);
-				m_view.measureWidth(param_for_measure);
-			}
-
-			if (m_scroll_bar_v) {
-				param_for_measure.num = m_scroll_v_width;
-				m_scroll_bar_v.measureWidth(param_for_measure);
-			}
-
-			if (m_scroll_bar_h) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_v_width);
-				m_scroll_bar_h.measureWidth(param_for_measure);
-			}
-
-			me.setMeasuredWidth(measured);
-
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-			var measured = 0;
-			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-				measured = param.num;
-
-			var param_for_measure = new SELF.MeasureParam();
-			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-
-			if (m_view) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_h_height);
-				m_view.measureHeight(param_for_measure);
-			}
-
-			if (m_scroll_bar_v) {
-
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_h_height);
-				m_scroll_bar_v.measureHeight(param_for_measure);
-			}
-
-			if (m_scroll_bar_h) {
-				param_for_measure.num = m_scroll_h_height;
-				m_scroll_bar_h.measureHeight(param_for_measure);
-			}
-
-			me.setMeasuredHeight(measured);
-		});
-
-		$PUBLIC_FUN_IMPL('onLayout', function(rc){
-
-			var width = rc.width();
-			var height = rc.height();
-
-			if (m_view)
-				m_view.layout(new UI.Rect(0, 0, 
-					m_view.getMeasuredWidth(), m_view.getMeasuredHeight()));
-			if (m_scroll_bar_v)
-				m_scroll_bar_v.layout(new UI.Rect(
-					width - m_scroll_bar_v.getMeasuredWidth(), 0,
-					width, m_scroll_bar_v.getMeasuredHeight()));
-			if (m_scroll_bar_h)
-				m_scroll_bar_h.layout(new UI.Rect(
-					0, height - m_scroll_bar_h.getMeasuredHeight(),
-					m_scroll_bar_h.getMeasuredWidth(), height));
-
-		});
-
-		$PUBLIC_FUN_IMPL('addContentFrame', function(frame){
-			m_view.addFrame(frame);
-		});
-
-		$PUBLIC_FUN_IMPL('getContentFrameCount', function(){
-			return m_view.getFrameCount();
-		});
-
-		$PUBLIC_FUN_IMPL('removeContentFrame', function(index){
-			return m_view.removeFrame(index);
-		});
-
-		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node) {
-			for (var i = 0; i < xml_node.childNodes.length; i++) {
-				var c = xml_node.childNodes[i];
-				// node element. 
-				if (c.nodeType != 1) continue; 
-				UI.XFrameXMLFactory.instance().buildFrame(c, m_view);
-			}
-		});
-
-		$MESSAGE_HANDLER('onViewRectChanged', function(n){
-			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
-				n.old.width(), n.old.height());
-		});
-
-		$MESSAGE_HANDLER('onContentRectChanged', function(n){
-			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
-				n.old.max_x, n.old.max_y);
-		});
-
-		$MESSAGE_HANDLER('onScrollChanged', function(n){
-			if (n.src == m_scroll_bar_h) {
-				m_view.setScrollX(n.pos);
-			}
-
-			if (n.src == m_scroll_bar_v) {
-				m_view.setScrollY(n.pos);
-			}
-
-		});
-
-		$MESSAGE_HANDLER('onMouseUp', function(e){
-			if (m_scroll_bar_v && 
-				m_scroll_bar_v.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
-				m_scroll_bar_v.getFocus();
-			else if (m_scroll_bar_h && 
-				m_scroll_bar_h.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
-				m_scroll_bar_h.getFocus();
-		});
-
-		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
-			if (m_scroll_bar_v && old_h != h)
-				m_scroll_bar_v[fn](h);
-			if (m_scroll_bar_h && old_w != w)
-				m_scroll_bar_h[fn](w);
-		}
-
-	
-	})
-	.$STATIC({
-		'buildFromXML' : buildFromXML,
-	});
-
-	$ENUM('UI.XScrollFrame.ScrollBar', {
-		'SCROLL_BAR_H' : 1,
-		'SCROLL_BAR_V' : 2,
-	});
-
-	function buildFromXML(xml_node, parent) {
-
-		var layout_param = parent ?
-			parent.generateLayoutParam(xml_node) :
-			new UI.XFrame.LayoutParam(xml_node);
-
-		var scroll_bar = 0;
-		var bar_bg_h = null;
-		var bar_fg_h = null;
-		var bar_bg_v = null;
-		var bar_fg_v = null;
-
-		if ((xml_node.getAttribute('h_scroll') || '').toLowerCase() == 'true')
-			scroll_bar |= this.ScrollBar.SCROLL_BAR_H;
-		if ((xml_node.getAttribute('v_scroll') || '').toLowerCase() == 'true')
-			scroll_bar |= this.ScrollBar.SCROLL_BAR_V;
-
-		if (!scroll_bar) {
-			UI.XFrameXMLFactory
-				.reportError('WARNING: No scroll bar specified for the scroll frame. Create the scroll frame failed. ');
-			return null;
-		}
-
-		if (scroll_bar & this.ScrollBar.SCROLL_BAR_H) {
-			bar_bg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_bg", null, "3partH", "scroll_bar_h_bg_part_");
-			bar_fg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_fg", null, "3partH", "scroll_bar_h_fg_part_");
-		}
-		if (scroll_bar & this.ScrollBar.SCROLL_BAR_V) {
-			bar_bg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_bg", null, "3partV", "scroll_bar_v_bg_part_");
-			bar_fg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_fg", null, "3partV", "scroll_bar_v_fg_part_");
-		}
-
-		var frame = new this(scroll_bar);
-		frame.create(parent, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE,
-			bar_bg_h, bar_fg_h, bar_bg_v, bar_fg_v);
-
-		return frame;
-
-	}
-
 
 
 })();
@@ -15895,6 +15462,602 @@ $ENUM('UI.XScrollView.NOTIFICATION', [
 })();
 
 
+;
+
+
+(function(){
+
+	$CLASS('UI.XTree', 
+	$EXTENDS(UI.XDock),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'setUnfold',
+			'isUnfolded',
+			'setChildItemIndent',
+
+			'setRootItemFrame',
+			'insertChildItemFrame',
+			'addChildItemFrame',
+			'getChildItemFrameCount',
+			'removeChildItemFrame',
+
+			'handleXMLChildNode',
+
+			'paintForeground',
+
+			'onLayout',
+
+			'getVCenter',
+		]);
+
+		$MESSAGE_MAP('NOTIFICATION', 
+		[
+			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onRootFrameOrFoldUnflodButtonRectChanged'),
+			$MAP(UI.XButton.NOTIFICATION.NOTIFICATION_BUTTON_CLICKED, 'onFoldUnfoldButtonClicked'),
+			$CHAIN(UI.XDock),
+		]);
+
+		var m_root_item_frame_container = null;
+		var m_child_item_frame_container = null;
+		var m_fold_unfold_button = null;
+		var m_child_indent = 0;
+
+		var FOLD_UNFOLD_BUTTION_MARGIN_RIGHT = 10;
+		var TREE_LINE_GRAY_DEEP = 0x99;
+
+		$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility /* = SELF.Visibility.VISIBILITY_NONE */, 
+			unfolded /* = true */, child_item_indent /* = 20*/, folded_button_face /* = null */, unfolded_button_face /* =null */) {
+
+			me.$PARENT(UI.XDock)
+				.create(parent, UI.XDock.DockType.DOCK_TOP2BOTTOM, UI.XDock.Align.ALIGN_LOW, layout, visibility);
+
+			var root_item_frame_container_layout = me.generateLayoutParam();
+			root_item_frame_container_layout.width = root_item_frame_container_layout.height =
+				SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT;
+
+			var child_item_frame_container_layout = me.generateLayoutParam();
+			child_item_frame_container_layout.width = child_item_frame_container_layout.height = 
+				SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT;
+
+			var fold_unfold_button_layout = me.generateLayoutParam();
+			fold_unfold_button_layout.width = fold_unfold_button_layout.height =
+				SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT;
+			fold_unfold_button_layout.margin_right = FOLD_UNFOLD_BUTTION_MARGIN_RIGHT;
+
+
+			m_root_item_frame_container = new UI.XDock();
+			m_root_item_frame_container.create(me.$THIS, UI.XDock.DockType.DOCK_LEFT2RIGHT,
+				UI.XDock.Align.ALIGN_MIDDLE, root_item_frame_container_layout, SELF.Visibility.VISIBILITY_SHOW);
+
+			m_child_item_frame_container = new UI.XDock();
+			m_child_item_frame_container.create(me.$THIS, UI.XDock.DockType.DOCK_TOP2BOTTOM,
+				UI.XDock.Align.ALIGN_LOW, child_item_frame_container_layout, SELF.Visibility.VISIBILITY_SHOW);
+
+			if (!folded_button_face)
+				folded_button_face = UI.XResourceMgr.getImage('img/ctrl/folded_button.png');
+			if (!unfolded_button_face)
+				unfolded_button_face = UI.XResourceMgr.getImage('img/ctrl/unfolded_button.png');
+
+			var button_faces = [folded_button_face, unfolded_button_face];
+			m_fold_unfold_button = new UI.XMultifaceButton();
+			m_fold_unfold_button.create(m_root_item_frame_container, button_faces,
+				fold_unfold_button_layout, SELF.Visibility.VISIBILITY_SHOW,
+				unfolded ? 1 : 0, false);
+
+			m_fold_unfold_button.addNotificationListener(me.$THIS);
+
+			me.setUnfold(unfolded);
+			me.setChildItemIndent(child_item_indent);
+		});
+
+		$PUBLIC_FUN_IMPL('setUnfold', function(unfold){
+
+			if (unfold && m_child_item_frame_container.getVisibility() ==
+				SELF.Visibility.VISIBILITY_SHOW)
+				return;
+			if (!unfold && m_child_item_frame_container.getVisibility() ==
+				SELF.Visibility.VISIBILITY_NONE)
+				return;
+
+			m_child_item_frame_container.setVisibility(unfold ?
+				SELF.Visibility.VISIBILITY_SHOW : SELF.Visibility.VISIBILITY_NONE);
+
+			m_fold_unfold_button.changeButtonFaceTo(unfold ? 1 : 0);
+		});
+
+		$PUBLIC_FUN_IMPL('isUnfolded', function(){
+
+			return m_child_item_frame_container.getVisibility() ==
+				SELF.Visibility.VISIBILITY_SHOW;
+
+		});
+
+		$PUBLIC_FUN_IMPL('setChildItemIndent', function(intent){
+
+			if (m_child_indent == intent)
+				return;
+
+			m_child_indent = intent;
+
+			UpdateLeftMarginOfChildItemContainer();
+
+		});
+		
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			m_root_item_frame_container = m_child_item_frame_container = null;
+			m_child_indent = 0;
+			me.$PARENT(UI.XDock).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('setRootItemFrame', function(frame){
+			var old = m_root_item_frame_container.removeFrame(1);
+			if (frame)
+				m_root_item_frame_container.addFrame(frame);
+			return old;
+		});
+
+		$PUBLIC_FUN_IMPL('insertChildItemFrame', function(frame, index){
+			m_child_item_frame_container.insertFrame(frame, index);
+		});
+
+		$PUBLIC_FUN_IMPL('removeChildItemFrame', function(index){
+			m_child_item_frame_container.removeFrame(index);
+		});
+
+		$PUBLIC_FUN_IMPL('getChildItemFrameCount', function(){
+			return m_child_item_frame_container.getFrameCount();
+		});
+
+		$PUBLIC_FUN_IMPL('addChildItemFrame', function(frame){
+			me.insertChildItemFrame(frame, getChildItemFrameCount());
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node){
+
+			var first_child = true;
+
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+
+				if (first_child) {
+					me.setRootItemFrame(null);
+					var child = UI.XFrameXMLFactory.instance().buildFrame(c, m_root_item_frame_container);
+					first_child = false;
+				} else {
+					UI.XFrameXMLFactory.instance().buildFrame(c, m_child_item_frame_container);
+				}
+			}
+		});
+
+		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, update_rect){
+
+			if (me.isUnfolded() && 
+				m_child_item_frame_container.getFrameCount()) {
+
+				var fold_unfold_button_rect = m_fold_unfold_button.getRect();
+				var child_item_frame_container_top = m_child_item_frame_container.getRect().top;
+				var lines_x_start = fold_unfold_button_rect.left + 
+					Math.floor(fold_unfold_button_rect.width() / 2) +
+					m_root_item_frame_container.getRect().left;
+				var lines_x_end = m_child_item_frame_container.getRect().left;
+				var v_line_y_start = m_root_item_frame_container.getRect().bottom;
+
+				if (!(lines_x_end - lines_x_start <= 0 || 
+					lines_x_start >= update_rect.right || lines_x_end <= update_rect.left)) {
+
+					var frame_count = m_child_item_frame_container.getFrameCount();
+					for (var i = 0; i < frame_count; i++) {
+						var current_frame = m_child_item_frame_container.getFrameByIndex(i);
+						if (current_frame.getVisibility() != SELF.Visibility.VISIBILITY_SHOW)
+							continue;
+
+						var h_line_y = current_frame.getRect().top + Math.max(0, current_frame.getVCenter())
+							+ child_item_frame_container_top;
+
+						var v_line_y_start = Math.max(v_line_y_start, update_rect.top);
+						var v_line_y_end = Math.min(h_line_y + 1, update_rect.bottom);
+
+						if (lines_x_start >= update_rect.left &&
+							lines_x_start < update_rect.right &&
+							v_line_y_end - v_line_y_start > 0)
+							UI.XLine.draw(ctx, new UI.Pt(lines_x_start, v_line_y_start),
+								new UI.Pt(lines_x_start, v_line_y_end), 1,
+								TREE_LINE_GRAY_DEEP, TREE_LINE_GRAY_DEEP, TREE_LINE_GRAY_DEEP,
+								true);
+
+						v_line_y_start = v_line_y_end;
+
+						var h_line_x_start = Math.max(update_rect.left, lines_x_start);
+						var h_line_x_end = Math.min(update_rect.right, lines_x_end);
+
+						if (h_line_y >= update_rect.top &&
+							h_line_y < update_rect.bottom &&
+							h_line_x_end - h_line_x_start > 0)
+							UI.XLine.draw(ctx, new UI.Pt(h_line_x_start, h_line_y),
+								new UI.Pt(h_line_x_end, h_line_y), 1,
+								TREE_LINE_GRAY_DEEP, TREE_LINE_GRAY_DEEP, TREE_LINE_GRAY_DEEP,
+								true);
+
+						if (h_line_y >= update_rect.bottom)
+							break;
+					}
+				}
+
+			}
+
+			me.$PARENT(UI.XDock).paintForeground(ctx, update_rect);
+		});
+
+		$PUBLIC_FUN_IMPL('onLayout', function(rc){
+			invalidateLines();
+			me.$PARENT(UI.XDock).onLayout(rc);
+			invalidateLines();
+		});
+
+		$PUBLIC_FUN_IMPL('getVCenter', function(){
+			var fold_unfold_button_rect = m_fold_unfold_button.getRect();
+			return fold_unfold_button_rect.top + 
+				Math.floor(fold_unfold_button_rect.height() / 2) +
+				m_root_item_frame_container.getRect().top;
+		});
+
+		$MESSAGE_HANDLER('onFoldUnfoldButtonClicked', function(n){
+			if (n.src != m_fold_unfold_button)
+				return;
+
+			if (me.isUnfolded())
+		 		me.setUnfold(false);
+		 	else
+		 		me.setUnfold(true);
+
+		});
+
+		$MESSAGE_HANDLER('onRootFrameOrFoldUnflodButtonRectChanged', function(n){
+
+			if (n.src == m_root_item_frame_container) {
+				if (n.new.left == n.old.left) return;
+				UpdateLeftMarginOfChildItemContainer();
+			} else if (n.src == m_fold_unfold_button) {
+				if (n.new.right == n.old.right) return;
+				UpdateLeftMarginOfChildItemContainer();
+			}
+
+		});
+
+
+		function UpdateLeftMarginOfChildItemContainer() {
+
+			var child_margin_left = m_child_indent;
+
+			child_margin_left += m_root_item_frame_container.getRect().left;
+			child_margin_left += m_fold_unfold_button.getRect().right +
+				FOLD_UNFOLD_BUTTION_MARGIN_RIGHT;
+
+			m_child_item_frame_container.beginUpdateLayoutParam().margin_left 
+				= child_margin_left;
+			m_child_item_frame_container.endUpdateLayoutParam();
+		}
+
+		function invalidateLines() {
+			var invalid_rect = new UI.Rect(me.parentToChild(me.getRect()));
+			invalid_rect.top = Math.max(invalid_rect.top, m_root_item_frame_container.getRect().top);
+
+			var child_container_rect = m_child_item_frame_container.getRect();
+			invalid_rect.right = Math.min(invalid_rect.right, child_container_rect.left);
+			invalid_rect.bottom = Math.min(invalid_rect.bottom, child_container_rect.bottom);
+
+			me.invalidateRect(invalid_rect);
+		}
+
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	function buildFromXML(xml_node, parent) {
+
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var unfolded = true;
+		var child_item_indent = 20;
+		var folded_button_face = null;
+		var unfolded_button_face = null;
+
+		var start_state_attr = xml_node.getAttribute('start_state') || '';
+		if (start_state_attr.toLowerCase() == 'folded') unfolded = false;
+
+		if (xml_node.hasAttribute('child_item_indent'))
+			child_item_indent = 
+				xml_node.getAttribute('child_item_indent') - 0 || 0;
+
+		folded_button_face = UI.XFrameXMLFactory.buildImage(xml_node, 
+			'folded_button', 'folded_button_type', 'normal', 'folded_button_part_');
+		unfolded_button_face = UI.XFrameXMLFactory.buildImage(xml_node,
+			'unfolded_button', 'unfolded_button_type', 'normal', 'unfolded_button_part_');
+
+		var frame = new this();
+		frame.create(parent, layout_param, this.Visibility.VISIBILITY_NONE,
+			unfolded, child_item_indent, folded_button_face, unfolded_button_face);
+
+		return frame;
+	}
+
+
+
+})();
+;
+
+(function() {
+
+	$CLASS('UI.XStatic', 
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'setRect',
+			'paintForeground',
+			
+			'onMeasureWidth',
+			'onMeasureHeight',
+
+			'setText',
+			'getText',
+		]);
+
+		var m_text = null;
+		var m_measured_height = 0;
+
+
+		$PUBLIC_FUN_IMPL('create', function(parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/, 
+			text) {
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+			me.setText(text);
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			me.setText(null);
+			m_measured_height = -1;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('setRect', function(new_rect){
+			if (me.getRect().equals(new_rect)) return;
+			if (m_text)
+				m_text.setDstRect(new UI.Rect(0,0,new_rect.width(), new_rect.height()));
+			me.$PARENT(UI.XFrame).setRect(new_rect);
+		});
+
+		$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rect){
+			if (m_text) m_text.draw(ctx, rect);
+			me.$PARENT(UI.XFrame).paintForeground(ctx, rect);
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			me.$PARENT(UI.XFrame).onMeasureWidth(param);
+
+			if (!m_text) return;
+
+			var measured = me.getMeasuredWidth();
+			var text_metric;
+
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					text_metric = m_text.measure(param.num);
+				else
+					text_metric = m_text.measure(UI.IXText.UNLIMITED);
+
+				var new_measured = Math.max(measured, text_metric.w);
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					new_measured = Math.min(new_measured, param.num);
+
+				me.setMeasuredWidth(new_measured);
+
+			} else
+				text_metric = m_text.measure(measured);
+
+			m_measured_height = text_metric.h;
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			me.$PARENT(UI.XFrame).onMeasureHeight(param);
+
+			if (!m_text) return;
+
+			if (param.spec != SELF.MeasureParam.Spec.MEASURE_EXACT) {
+				var measured = me.getMeasuredHeight();
+				var new_measured = Math.max(measured, m_measured_height);
+
+				if (param.spec == SELF.MeasureParam.Spec.MEASURE_ATMOST)
+					new_measured = Math.min(param.num, new_measured);
+
+				me.setMeasuredHeight(new_measured);
+			}
+
+			m_measured_height = 0;
+
+		});
+
+		$PUBLIC_FUN_IMPL('setText', function(text){
+			
+			if (m_text == text) return null;
+
+			var old = m_text;
+			m_text = text;
+
+			if (m_text) {
+				var frame_rect = me.getRect();
+				m_text.setDstRect(new UI.Rect(0,0,frame_rect.width(), frame_rect.height()));
+			}
+
+			me.invalidateLayout();
+			me.invalidateAfterLayout();
+
+			return old;
+		});
+
+		$PUBLIC_FUN_IMPL('getText', function(){
+			if (!m_text) return '';
+			return m_text.getText();
+		});
+
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	function buildFromXML(xml_node, parent) {
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var text = UI.XFrameXMLFactory.buildText(xml_node);
+
+		var frame = new this();
+		frame.create(parent, layout_param, 
+			this.Visibility.VISIBILITY_NONE, text);
+
+		return frame;
+	}
+
+})();
+;
+
+$CLASS('UI.XScrollView',
+$EXTENDS(UI.XFrame),
+function(me, SELF) {
+
+	$PUBLIC_FUN([
+		'onMeasureWidth',
+		'onMeasureHeight',
+
+		'onLayout',
+
+		'destroy', 
+	]);
+
+	var m_max_x = 0;
+	var m_max_y = 0;
+
+	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+		var measured_width = 
+			onMeasureLayoutDirection(param, 
+				'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
+		me.setMeasuredWidth(measured_width);
+	});
+
+	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+		var measured_height =
+			onMeasureLayoutDirection(param,
+				'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
+		me.setMeasuredHeight(measured_height);
+	});
+
+	$PUBLIC_FUN_IMPL('onLayout', function(param){
+
+		var max_x = 0, max_y = 0;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+			var layout_param = cur.getLayoutParam();
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var rect = new UI.Rect(layout_param.x, layout_param.y,
+				layout_param.x + cur.getMeasuredWidth(),
+				layout_param.y + cur.getMeasuredHeight());
+
+			max_x = Math.max(max_x, rect.right);
+			max_y = Math.max(max_y, rect.bottom);
+
+			cur.layout(rect);
+		}
+
+		handleMaxXY(max_x, max_y);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		me.$PARENT(UI.XFrame).destroy();
+		m_max_x = m_max_y = 0;
+	});
+
+	function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
+			layout_param_pos, layout_param_size, layout_margin_end) {
+
+		var measured = 0;
+		if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+			measured = param.num;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+
+			var layout_param = cur.getLayoutParam();
+
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var param_for_measure = new SELF.MeasureParam();
+
+			switch (layout_param[layout_param_size]) {
+				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+					param_for_measure.num = 0;
+					break;
+				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = max(0, 
+						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
+					break;
+				default:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
+					break;
+			}
+
+			cur[child_measure_proc](param_for_measure);
+		}
+
+		return measured;
+	}
+
+	function handleMaxXY(max_x, max_y) {
+		if (m_max_x == max_x &&
+			m_max_y == max_y)
+			return;
+
+		var old = {max_x: m_max_x, max_y: m_max_y};
+		m_max_x = max_x;
+		m_max_y = max_y;
+
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED,
+				new : {
+					'max_x' : m_max_x,
+					'max_y' : m_max_y,
+				},
+				old : old
+			});
+	}
+});
+
+$ENUM('UI.XScrollView.NOTIFICATION', [
+	'NOTIFICAITON_BOUND_CHANGED',
+]);
 ;
 
 (function(){
@@ -16441,3 +16604,286 @@ $ENUM('UI.XScrollBar.NOTIFICATION',
 ]);
 
 
+;
+
+(function(){
+
+
+	$CLASS('UI.XScrollFrame',
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
+
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
+
+			'addContentFrame',
+			'getContentFrameCount',
+			'removeContentFrame',
+
+			'onMeasureWidth',
+			'onMeasureHeight',
+
+			'onLayout',
+
+			'handleXMLChildNode',
+		]);
+
+		$MESSAGE_MAP('NOTIFICATION', 
+		[
+			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onViewRectChanged'),
+			$MAP(UI.XScrollView.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED, 'onContentRectChanged'),
+			$MAP(UI.XScrollBar.NOTIFICATION.NOTIFICATION_SCROLLCHANGED, 'onScrollChanged'),
+			$CHAIN(UI.XFrame),
+		]);
+
+		$MESSAGE_MAP('EVENT', 
+		[
+			$MAP('mouseup', 'onMouseUp'),
+			$CHAIN(UI.XFrame),
+		]);
+
+		var m_scroll_bar;
+		var m_scroll_bar_h = null;
+		var m_scroll_bar_v = null;
+		var m_view = null;
+
+		var m_scroll_h_height = 15;
+		var m_scroll_v_width = 15;
+
+		$CONSTRUCTOR(function(scroll_bar){
+			m_scroll_bar = scroll_bar;
+		});
+
+		$PUBLIC_FUN_IMPL('create', function(
+			parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+			bg_h /* = null*/, fg_h /* = null*/, bg_v /* = null*/, fg_v /* = null */){
+
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H) && !m_scroll_bar_h) {
+				m_scroll_bar_h = new UI.XScrollBar();
+				m_scroll_bar_h.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_H,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_h, fg_h);
+				m_scroll_bar_h.addNotificationListener(me.$THIS);
+			}
+
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V) && !m_scroll_bar_v) {
+				m_scroll_bar_v = new UI.XScrollBar();
+				m_scroll_bar_v.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_V,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_v, fg_v);
+				m_scroll_bar_v.addNotificationListener(me.$THIS);
+			}
+
+			if (!m_view) {
+				m_view = new UI.XScrollView();
+				m_view.create(me.$THIS, me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW);
+				m_view.addNotificationListener(me.$THIS);
+			}
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			m_view = m_scroll_bar_h = m_scroll_bar_v = null;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_view.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+				param_for_measure.num = m_scroll_v_width;
+				m_scroll_bar_v.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_scroll_bar_h.measureWidth(param_for_measure);
+			}
+
+			me.setMeasuredWidth(measured);
+
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_view.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_scroll_bar_v.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = m_scroll_h_height;
+				m_scroll_bar_h.measureHeight(param_for_measure);
+			}
+
+			me.setMeasuredHeight(measured);
+		});
+
+		$PUBLIC_FUN_IMPL('onLayout', function(rc){
+
+			var width = rc.width();
+			var height = rc.height();
+
+			if (m_view)
+				m_view.layout(new UI.Rect(0, 0, 
+					m_view.getMeasuredWidth(), m_view.getMeasuredHeight()));
+			if (m_scroll_bar_v)
+				m_scroll_bar_v.layout(new UI.Rect(
+					width - m_scroll_bar_v.getMeasuredWidth(), 0,
+					width, m_scroll_bar_v.getMeasuredHeight()));
+			if (m_scroll_bar_h)
+				m_scroll_bar_h.layout(new UI.Rect(
+					0, height - m_scroll_bar_h.getMeasuredHeight(),
+					m_scroll_bar_h.getMeasuredWidth(), height));
+
+		});
+
+		$PUBLIC_FUN_IMPL('addContentFrame', function(frame){
+			m_view.addFrame(frame);
+		});
+
+		$PUBLIC_FUN_IMPL('getContentFrameCount', function(){
+			return m_view.getFrameCount();
+		});
+
+		$PUBLIC_FUN_IMPL('removeContentFrame', function(index){
+			return m_view.removeFrame(index);
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node) {
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+				UI.XFrameXMLFactory.instance().buildFrame(c, m_view);
+			}
+		});
+
+		$MESSAGE_HANDLER('onViewRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
+				n.old.width(), n.old.height());
+		});
+
+		$MESSAGE_HANDLER('onContentRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
+				n.old.max_x, n.old.max_y);
+		});
+
+		$MESSAGE_HANDLER('onScrollChanged', function(n){
+			if (n.src == m_scroll_bar_h) {
+				m_view.setScrollX(n.pos);
+			}
+
+			if (n.src == m_scroll_bar_v) {
+				m_view.setScrollY(n.pos);
+			}
+
+		});
+
+		$MESSAGE_HANDLER('onMouseUp', function(e){
+			if (m_scroll_bar_v && 
+				m_scroll_bar_v.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_v.getFocus();
+			else if (m_scroll_bar_h && 
+				m_scroll_bar_h.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_h.getFocus();
+		});
+
+		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
+			if (m_scroll_bar_v && old_h != h)
+				m_scroll_bar_v[fn](h);
+			if (m_scroll_bar_h && old_w != w)
+				m_scroll_bar_h[fn](w);
+		}
+
+	
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	$ENUM('UI.XScrollFrame.ScrollBar', {
+		'SCROLL_BAR_H' : 1,
+		'SCROLL_BAR_V' : 2,
+	});
+
+	function buildFromXML(xml_node, parent) {
+
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var scroll_bar = 0;
+		var bar_bg_h = null;
+		var bar_fg_h = null;
+		var bar_bg_v = null;
+		var bar_fg_v = null;
+
+		if ((xml_node.getAttribute('h_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_H;
+		if ((xml_node.getAttribute('v_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_V;
+
+		if (!scroll_bar) {
+			UI.XFrameXMLFactory
+				.reportError('WARNING: No scroll bar specified for the scroll frame. Create the scroll frame failed. ');
+			return null;
+		}
+
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_H) {
+			bar_bg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_bg", null, "3partH", "scroll_bar_h_bg_part_");
+			bar_fg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_fg", null, "3partH", "scroll_bar_h_fg_part_");
+		}
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_V) {
+			bar_bg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_bg", null, "3partV", "scroll_bar_v_bg_part_");
+			bar_fg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_fg", null, "3partV", "scroll_bar_v_fg_part_");
+		}
+
+		var frame = new this(scroll_bar);
+		frame.create(parent, layout_param, 
+			UI.XFrame.Visibility.VISIBILITY_NONE,
+			bar_bg_h, bar_fg_h, bar_bg_v, bar_fg_v);
+
+		return frame;
+
+	}
+
+
+
+})();

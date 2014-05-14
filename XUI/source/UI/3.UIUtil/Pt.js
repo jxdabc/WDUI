@@ -10,6 +10,7 @@ $STRUCT('UI.Pt', function(SELF){
 	$PUBLIC_FUN([
 		'inRect',
 		'toString',
+		'equals',
 	]);
 
 
@@ -30,6 +31,10 @@ $STRUCT('UI.Pt', function(SELF){
 
 		this.x = x;
 		this.y = y;
+	});
+
+	$PUBLIC_FUN_IMPL('equals', function(other) {
+		return this.x == other.x && this.y == other.y;
 	});
 
 	$PUBLIC_FUN_IMPL('inRect', function(rc){

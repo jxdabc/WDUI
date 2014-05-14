@@ -38,8 +38,10 @@
 			'invalidateRect',
 			'invalidateAfterLayout',
 
+			'getVCenter',
 			'getRect',
 			'setRect',
+
 
 			'setScrollX',
 			'setScrollY',
@@ -271,7 +273,7 @@
 
 				m_delay_update_layout_param_scheduled = true;
 
-				UI.XMessageService.instance().
+				UI.XEventService.instance().
 					postFrameEvent(me.$THIS, {'id' :UI.XFrame.EVENT_ID.EVENT_X_DELAY_UDPATE_LAYOUT});
 
 				return 'delayed';
@@ -292,6 +294,10 @@
 
 		$PUBLIC_FUN_IMPL('generateLayoutParam', function(copy_from_or_xml_or_null){
 				return new SELF.LayoutParam(copy_from_or_xml_or_null);
+		});
+
+		$PUBLIC_FUN_IMPL('getVCenter', function(){
+			return Math.floor(me.getRect().height() / 2);
 		});
 
 		$PUBLIC_FUN_IMPL('getRect', function(){
@@ -985,10 +991,10 @@
 		});
 
 		$MESSAGE_HANDLER('onDelayupdateLayout', function(){
-			if (!m_delay_update_layout_param_schedule || !m_delay_layout_param)
+			if (!m_delay_update_layout_param_scheduled || !m_delay_layout_param)
 				return;
 
-			m_delay_update_layout_param_schedule = false;
+			m_delay_update_layout_param_scheduled = false;
 
 			m_layout_param = m_delay_layout_param;
 			m_delay_layout_param = null;
