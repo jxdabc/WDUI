@@ -32,6 +32,8 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 
 	$PUBLIC_FUN_IMPL('draw', function(ctx, string_or_lines, rect, halign, valign) {
 
+		if (rect.isEmpty()) return;
+
 		ctx.save();
 
 		ctx.beginPath();
@@ -257,7 +259,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		var face = face.split(/,/);
 		$.each(face, function(i,v){
 			var normal_value = $.trim(v);
-			if (normal_value.indexOf(' ') != -1)
+			if (normal_value.indexOf(' ') != -1 && normal_value.substr(0,1) != '\'')
 				normal_value = '\'' + normal_value + '\'';
 			face[i] = normal_value;
 		});

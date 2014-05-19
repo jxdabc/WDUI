@@ -130,7 +130,6 @@ function(me, SELF){
 	}
 
 	function onFocus() {
-		console.log('activated');
 		me.throwNotification(
 		{
 			'id' : SELF.NOTIFICATION.NOTIFICATION_ACTIVATED,
@@ -140,7 +139,6 @@ function(me, SELF){
 	}
 
 	function onBlur() {
-		console.log('deactivated');
 		me.throwNotification(
 		{
 			'id' : SELF.NOTIFICATION.NOTIFICATION_DEACTIVATED,

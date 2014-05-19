@@ -72,7 +72,9 @@ function(me, SELF) {
 		m_text_service = new UI.XTextService(me.getContainer);
 		m_text_service.addNotificationListener(me.$THIS);
 		m_text = new UI.XTextCanvasText();
+		m_text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, UI.XTextCanvasText.Align.ALIGN_MIDDLE);
 		m_text_reversed = new UI.XTextCanvasText();
+		m_text_reversed.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, UI.XTextCanvasText.Align.ALIGN_MIDDLE);
 		m_text_reversed.setColor('#FFF');
 
 		me.$PARENT(UI.XFrame).create(parent, layout, visibility);

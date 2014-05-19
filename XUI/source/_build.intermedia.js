@@ -11482,7 +11482,6 @@ function(me, SELF){
 	}
 
 	function onFocus() {
-		console.log('activated');
 		me.throwNotification(
 		{
 			'id' : SELF.NOTIFICATION.NOTIFICATION_ACTIVATED,
@@ -11492,7 +11491,6 @@ function(me, SELF){
 	}
 
 	function onBlur() {
-		console.log('deactivated');
 		me.throwNotification(
 		{
 			'id' : SELF.NOTIFICATION.NOTIFICATION_DEACTIVATED,
@@ -14585,6 +14583,8 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 
 	$PUBLIC_FUN_IMPL('draw', function(ctx, string_or_lines, rect, halign, valign) {
 
+		if (rect.isEmpty()) return;
+
 		ctx.save();
 
 		ctx.beginPath();
@@ -14810,7 +14810,7 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 		var face = face.split(/,/);
 		$.each(face, function(i,v){
 			var normal_value = $.trim(v);
-			if (normal_value.indexOf(' ') != -1)
+			if (normal_value.indexOf(' ') != -1 && normal_value.substr(0,1) != '\'')
 				normal_value = '\'' + normal_value + '\'';
 			face[i] = normal_value;
 		});
@@ -16903,7 +16903,9 @@ function(me, SELF) {
 		m_text_service = new UI.XTextService(me.getContainer);
 		m_text_service.addNotificationListener(me.$THIS);
 		m_text = new UI.XTextCanvasText();
+		m_text.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, UI.XTextCanvasText.Align.ALIGN_MIDDLE);
 		m_text_reversed = new UI.XTextCanvasText();
+		m_text_reversed.setAlignment(UI.XTextCanvasText.Align.ALIGN_START, UI.XTextCanvasText.Align.ALIGN_MIDDLE);
 		m_text_reversed.setColor('#FFF');
 
 		me.$PARENT(UI.XFrame).create(parent, layout, visibility);
