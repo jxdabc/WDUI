@@ -139,6 +139,8 @@ $STRUCT('UI.Rect', function(SELF){
 		this.top += y;
 		this.right += x;
 		this.bottom += y;
+
+		return this;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function () {

@@ -2,7 +2,7 @@
 
 (function(){
 	$CLASS('UI.XFrame', 
-	$EXTENDS(UI.IXNotificationListener),
+	$EXTENDS(UI.XEasyNotificationListener, UI.XEasyNotificationThrower),
 	function(me, SELF){
 
 		$PUBLIC_FUN([
@@ -83,10 +83,6 @@
 			'paintBackground',
 			'paintForeground',
 
-			'addNotificationListener',
-			'removeNofiticationListener',
-			'throwNotification',
-
 			'getTopFrameFromPoint',
 
 			'getEventManager',
@@ -95,13 +91,15 @@
 			'childToParent',
 			'parentToChild',
 			'otherFrameToThisFrame',
+			'toContainer',
+
+			'getContainer',
+			'setCursor',
 
 			'destroy',
 			'isFrameActive',
 
 			'onNotification',
-			'genRemoteRef',
-			'recycleRemoteRef',
 		]);
 
 		$MESSAGE_MAP('EVENT', 
@@ -143,10 +141,6 @@
 		var m_selected_state = false;
 		var m_mouse_over = false;
 		var m_mouse_down = false;
-
-
-		var m_notification_listener = [];
-		var m_remote_ref = [];
 
 		var m_active = false;
 
@@ -716,60 +710,23 @@
 
 		$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
 			var parent = m_parent;
-			m_parent = NULL;
+			m_parent = null;
 			me.throwNotification({
 				'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_DETACHED_FROM_PARENT,
 				'parent' : parent
 			});
 		});
-
-		$PUBLIC_FUN_IMPL('addNotificationListener', function(listener){
-			m_notification_listener.push(listener.genRemoteRef());
-		});
-
-		$PUBLIC_FUN_IMPL('removeNofiticationListener', function(listener){
-			for (var i = 0; i < m_notification_listener.length; i++) {
-				if (m_notification_listener[i].obj == listener) {
-					listener.recycleRemoteRef(m_notification_listener[i]);
-					m_notification_listener.splice(i,1);
-					break;
-				}
-			}
-		});
-
-		$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
-
-			notification.src = me.$THIS;
-
-			var notification_listeners = m_notification_listener;
-
-			for (var i = 0; i < notification_listeners.length; /*no i++*/) {
-				var r = notification_listeners[i];
-				if (r.obj) {r.obj.onNotification(notification); i++;}
-				else notification_listeners.splice(i,1);
-			}
-		});
+		
 
 		$PUBLIC_FUN_IMPL('onNotification', function(notification){
 			me.$THIS.$DISPATCH_MESSAGE('NOTIFICATION', notification);
 		});
 
-		$PUBLIC_FUN_IMPL('genRemoteRef', function(){
-			var ref = {'obj' : me.$THIS};
-			m_remote_ref.push(ref);
-			return ref;
-		});
-
-		$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
-			var index = m_remote_ref.indexOf(ref);
-			m_remote_ref.splice(index, 1);
-		});
-
 		$PUBLIC_FUN_IMPL('destroy', function(){
 
-			me.setVisibility(SELE.VISIBILITY.VISIBILITY_NONE);
+			me.setVisibility(SELF.Visibility.VISIBILITY_NONE);
 
-			setParent(null);
+			me.setParent(null);
 
 			while (m_child_frames.length) {
 				var frame = m_child_frames.last();
@@ -779,9 +736,9 @@
 			m_last_measure_width_param.reset();
 			m_last_measure_height_param.reset();
 
-			setRect(new UI.Rect(0, 0, 0, 0));
+			me.setRect(new UI.Rect(0, 0, 0, 0));
 
-			me.setBackground(NULL);
+			me.setBackground(null);
 
 			me.setTouchable(false);
 			me.setMouseOverLayer(null);
@@ -804,12 +761,8 @@
 			m_mouse_over = false;
 			m_mouse_down = false;
 
-			m_notification_listener = [];
-
-			$.each(m_remote_ref, function(i,v){
-				v.obj = null;
-			});
-			m_remote_ref = [];
+			me.clearNotificationListener();
+			me.$PARENT(UI.XEasyNotificationListener).destroy();
 
 			m_active = false;
 		});
@@ -908,6 +861,30 @@
 
 			return new UI.Pt(target_pt.x - this_org_pt.x,
 				target_pt.y - this_org_pt.y);
+		});
+
+		$PUBLIC_FUN_IMPL('toContainer', function(pt_or_rect){
+			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+				var rc = pt_or_rect;
+				var left_top = me.toContainer(rc.leftTop());
+				var right_bottpm = me.toContainer(rc.rightBottom());
+				return new UI.Rect(left_top, right_bottpm);
+			}
+
+			var pt = pt_or_rect;
+
+			if (m_parent) return m_parent.toContainer(me.childToParent(pt));
+
+			return pt;
+		});
+
+		$PUBLIC_FUN_IMPL('getContainer', function(){
+			if (m_parent) return m_parent.getContainer();
+			return null;
+		});
+
+		$PUBLIC_FUN_IMPL('setCursor', function(cursor){
+			if (m_parent) m_parent.setCursor(cursor);
 		});
 
 		$PUBLIC_FUN_IMPL('measureWidth', function(param){

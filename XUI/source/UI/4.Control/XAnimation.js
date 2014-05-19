@@ -112,7 +112,7 @@
 
 			m_current_frame = 0;
 
-			if (m_frames.isImageLoaded()) {
+			if (m_frames && m_frames.isImageLoaded()) {
 				me.invalidateLayout();
 				switchFrame();
 			}

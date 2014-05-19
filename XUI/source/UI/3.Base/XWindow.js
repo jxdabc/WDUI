@@ -20,6 +20,11 @@
 
 			'getEventManager',
 
+			'getContainer',
+			'setCursor',
+
+			'toContainer',
+
 			'destroy',
 		]);
 
@@ -153,6 +158,27 @@
 
 		$PUBLIC_FUN_IMPL('getEventManager', function(){
 			return m_event_manager;
+		});
+
+		$PUBLIC_FUN_IMPL('toContainer', function(pt_or_rect){
+			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+				var rect = pt_or_rect;
+				return me.$PARENT(UI.XFrame).toContainer(rect);
+			}
+			
+			var pt = pt_or_rect;
+			var window_position = m_$window_canvas.position();
+
+			return new UI.Pt(pt.x + window_position.left,
+				pt.y + window_position.top);
+		});
+
+		$PUBLIC_FUN_IMPL('getContainer', function () {
+			return m_$window_container[0];
+		});
+
+		$PUBLIC_FUN_IMPL('setCursor', function(cursor){
+			m_$window_canvas.css('cursor', cursor);
 		});
 
 		$PUBLIC_FUN_IMPL('destroy', function(){

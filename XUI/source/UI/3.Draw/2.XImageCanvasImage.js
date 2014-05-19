@@ -84,7 +84,10 @@ function(me, SELF){
 		if (m_dst_rect.equals(rc))
 			return;
 
-		releaseBuffer();
+		if (rc.width() != m_dst_rect.width() ||
+			rc.height() != m_dst_rect.height())
+			releaseBuffer();
+		
 		m_dst_rect = rc;
 	});
 

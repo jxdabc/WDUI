@@ -269,6 +269,8 @@
 
 		function UpdateLeftMarginOfChildItemContainer() {
 
+			if (!m_child_item_frame_container) return;
+
 			var child_margin_left = m_child_indent;
 
 			child_margin_left += m_root_item_frame_container.getRect().left;

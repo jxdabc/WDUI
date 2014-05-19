@@ -108,9 +108,6 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	}
 
 	function onEvent(e) {
-
-
-
 		var offset_frame = m_$position_canvas.offset();
 		if (typeof e.pageX != 'undefined' &&
 			typeof e.pageY != 'undefined')

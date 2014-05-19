@@ -32,6 +32,8 @@ function(me, SELF){
 
 	var m_buffer = null;
 
+	var m_canvas_text = null;
+
 	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
 		if (!m_buffer) refreshBuffer();
 
@@ -59,7 +61,10 @@ function(me, SELF){
 	$PUBLIC_FUN_IMPL('setDstRect', function (rc) {
 		if (rc.equals(m_dst_rect)) return;
 
-		releaseBuffer();
+		if (rc.width() != m_dst_rect.width() ||
+			rc.height() != m_dst_rect.height())
+			releaseBuffer();
+		
 		m_dst_rect  = rc;
 	});
 
@@ -67,9 +72,16 @@ function(me, SELF){
 		return m_text;
 	});
 
-	$PUBLIC_FUN_IMPL('measure', function (width_limit) {
-		var canvas_text = build_canvas_text();
-		return canvas_text.measureText(m_text, width_limit);
+	$PUBLIC_FUN_IMPL('measure', function (width_limit, start /* = 0 */, count /* = m_text.length */) {
+
+		var text = m_text;
+
+		if (typeof start != 'undefined')
+			if (typeof count != 'undefined') text = m_text.substr(start, count);
+			else text = m_text.substr(start);
+
+		var canvas_text = get_canvas_text();
+		return canvas_text.measureText(text, width_limit);
 	});
 
 	$PUBLIC_FUN_IMPL('setText', function (text) {
@@ -87,13 +99,18 @@ function(me, SELF){
 			return;
 
 		releaseBuffer();
+
 		m_face = face;
 		m_size = size;
 		m_style = style;
+
+		m_canvas_text = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setColor', function (color) {
 		m_color = color;
+
+		m_canvas_text = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setAlignment', function (halign, valign) {
@@ -117,7 +134,7 @@ function(me, SELF){
 		m_buffer.width = m_dst_rect.width();
 		m_buffer.height = m_dst_rect.height();
 
-		var canvas_text = build_canvas_text();
+		var canvas_text = get_canvas_text();
 
 		canvas_text.draw(m_buffer.getContext('2d'),
 			m_text, 
@@ -127,20 +144,23 @@ function(me, SELF){
 		);
 	}
 
-	function build_canvas_text () {
-		var canvas_text = new UI.XCanvasText();
-		canvas_text.setFontFace(m_face);
-		canvas_text.setFontSize(m_size);
-		canvas_text.setFontColor(m_color);
+	function get_canvas_text () {
 
-		canvas_text.setBold(
-			!!(m_style & SELF.Style.STYLE_BOLD)
-		);
-		canvas_text.setItalic(
-			!!(m_style & SELF.Style.STYLE_ITARIC)
-		);
+		if (!m_canvas_text) {
+			m_canvas_text = new UI.XCanvasText();
+			m_canvas_text.setFontFace(m_face);
+			m_canvas_text.setFontSize(m_size);
+			m_canvas_text.setFontColor(m_color);
 
-		return canvas_text;
+			m_canvas_text.setBold(
+				!!(m_style & SELF.Style.STYLE_BOLD)
+			);
+			m_canvas_text.setItalic(
+				!!(m_style & SELF.Style.STYLE_ITARIC)
+			);
+		}
+
+		return m_canvas_text;
 	}
 
 

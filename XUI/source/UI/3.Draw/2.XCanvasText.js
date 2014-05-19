@@ -80,23 +80,35 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
 		face = normalFontFace(face);
 		m_font_face = face;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
 		m_font_size = size - 0;
 		m_line_height = Math.round(size * m_line_height_mutiplier);
+
+		m_measure_canvas = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
 		m_line_height = size - 0;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setFontColor', function (color) {
 		m_font_color = color;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setBold', function (b) {
 		m_bold = b;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setItalic', function (b) {
 		m_italic = b;
+
+		m_measure_canvas = null;
 	});	
 
 	function getYStart(valign, line_count, height) {
@@ -124,6 +136,10 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	function stringToLines(string, max_width, ctx) {
 
 		var lines = [];
+
+		if (max_width == Number.POSITIVE_INFINITY)
+			return [{'text' : string, 'width' : ctx.measureText(string).width}];
+
 		var words = stringToWordArray(string);
 
 		var line = null;
@@ -156,13 +172,14 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	}
 
 	$PUBLIC_FUN_IMPL('measureText', function(text, width_limit){
-		if (!m_measure_canvas)
+		
+		var ctx = null;
+		if (!m_measure_canvas) {
 			m_measure_canvas = document.createElement('canvas');
-
-		var ctx = m_measure_canvas.getContext('2d');
-		ctx.save();
-		prepareCtxFont(ctx);
-
+			ctx = m_measure_canvas.getContext('2d');
+			prepareCtxFont(ctx);
+		} else ctx = m_measure_canvas.getContext('2d');
+			
 		var lines = stringToLines(text, width_limit, ctx);
 
 		var max_x = 0, max_y = 0;
@@ -171,8 +188,6 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			max_x = Math.max(max_x, v.width);
 		});
 		max_y = lines.length * m_line_height;
-
-		ctx.restore();
 
 		return new UI.Size(max_x, max_y);
 	});

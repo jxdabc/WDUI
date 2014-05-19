@@ -53,8 +53,6 @@
 					cureent_end_y = end.y;
 				}
 
-				console.log(ops[op], current_end_x, cureent_end_y);
-
 				ctx[ops[op]](current_end_x, cureent_end_y);
 
 				current_end += DOTTED_LEN;

@@ -160,7 +160,7 @@
 
 		function refreshButtonFace() {
 			var background = me.getBackground();
-			if (!background.isImageLoaded()) return;
+			if (!background || !background.isImageLoaded()) return;
 
 			var state = m_disabled ? 
 				SELF.BtnState.BTN_DISABLED : SELF.BtnState.BTN_NORMAL;

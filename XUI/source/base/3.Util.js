@@ -22,4 +22,12 @@ String.prototype.format = function()
 String.prototype.upperFirst = function()
 {
 	return this.substring(0, 1).toUpperCase() + this.substring(1);
+	
+}
+
+Math.realFloor = function(num) {
+    var n = Math.floor(Math.abs(num));
+    if (num < 0)
+        n = -n;
+    return n;
 }

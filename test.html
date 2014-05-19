@@ -2,6 +2,8 @@
 
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 
+<input type="text" id="test_input" />
+
 <script type="text/javascript" src="XUI/release/XUI.js"></script>
 
 <div id="test_div2" style="width:80%;height:1000px; border:1px solid red;margin-bottom:20px;">
@@ -10,8 +12,14 @@
 <div id="test_div" style="width:80%;height:600px; border:1px solid red;margin-bottom:20px;">
 </div>
 
+<canvas width="500" height="100" id="test_canvas_input">
+</canvas>
+
+<br />
+
 <canvas width="800" height="5000" id="test_canvas">
 </canvas>
+
 
 <script type="text/javascript">
 
@@ -29,7 +37,7 @@
 				var sys_max_button_face = 0;
 				var win_width = 800;
 				var win_height = 600;
-				sys_max_button.addNotificationListener(new UI.EasyNotificationListener(function(n){
+				sys_max_button.addNotificationListener(new UI.XEasyNotificationListener(function(n){
 					if (n.id != UI.XButton.NOTIFICATION.NOTIFICATION_BUTTON_CLICKED)
 						return;
 
@@ -57,6 +65,7 @@
 	})
 	()
 	;
+
 
 	// test frame
 	(function(){

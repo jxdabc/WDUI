@@ -10364,6 +10364,14 @@ String.prototype.format = function()
 String.prototype.upperFirst = function()
 {
 	return this.substring(0, 1).toUpperCase() + this.substring(1);
+	
+}
+
+Math.realFloor = function(num) {
+    var n = Math.floor(Math.abs(num));
+    if (num < 0)
+        n = -n;
+    return n;
 }
 ;
 
@@ -11014,6 +11022,8 @@ $STRUCT('UI.Size', function(SELF){
 	});
 
 
+
+
 });
 ;
 
@@ -11156,6 +11166,8 @@ $STRUCT('UI.Rect', function(SELF){
 		this.top += y;
 		this.right += x;
 		this.bottom += y;
+
+		return this;
 	});
 
 	$PUBLIC_FUN_IMPL('toString', function () {
@@ -11245,8 +11257,60 @@ $CLASS('UI.IXNotificationListener', function(me,SELF){
 	});
 
 });
+$CLASS('UI.XEasyNotificationThrower', 
+function(me, SELF){
+	
+	$PUBLIC_FUN([
+		'addNotificationListener',
+		'removeNofiticationListener',
+		'throwNotification',
+		'clearNotificationListener',
+	]);
 
-$CLASS('UI.EasyNotificationListener', 
+	var m_notification_listener = [];
+
+	$PUBLIC_FUN_IMPL('addNotificationListener', function(listener){
+			m_notification_listener.push(listener.genRemoteRef());
+	});
+
+	$PUBLIC_FUN_IMPL('removeNofiticationListener', function(listener){
+		for (var i = 0; i < m_notification_listener.length; i++) {
+			if (m_notification_listener[i].obj == listener) {
+				listener.recycleRemoteRef(m_notification_listener[i]);
+				m_notification_listener.splice(i,1);
+				break;
+			}
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
+
+		notification.src = me.$THIS;
+
+		for (var i = 0; i < m_notification_listener.length;/* no i++ */)
+			if (!m_notification_listener[i].obj) m_notification_listener.splice(i,1);
+			else i++;
+
+		var notification_listeners = copyArray(m_notification_listener);
+		for (var i = 0; i < notification_listeners.length; i++) {
+			var r = notification_listeners[i];
+			r.obj.onNotification(notification);
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('clearNotificationListener', function(){
+		m_notification_listener = [];
+	});
+
+	function copyArray(arr) {
+		var new_arr = [];
+		for (var i = 0; i < arr.length; i++)
+			new_arr.push(arr[i]);
+		return new_arr;
+	}
+
+});
+$CLASS('UI.XEasyNotificationListener', 
 $EXTENDS(UI.IXNotificationListener),
 function(me,SELF){
 
@@ -11288,9 +11352,170 @@ function(me,SELF){
 });
 ;
 
+$CLASS('UI.XTextService', 
+$EXTENDS(UI.XEasyNotificationThrower),
+function(me, SELF){
+
+	$PUBLIC_FUN([
+		'activate',
+		'deactivate',
+		'position',
+
+		'setOperationSection',
+
+		'setPositiveDiv',
+	]);
+
+	$CONSTRUCTOR(function(){
+		m_$input = $('<input type="text">');
+
+		m_$input.css({
+			'opacity' 	: '0',
+			'position' 	: 'absolute',
+			'z-index' 	: '-8',
+			'width' 	: '1px',
+		});
+
+		m_$input.on('keydown', checkUpdate);
+		m_$input.on('keyup', checkUpdate);
+		m_$input.on('focus', onFocus);
+		m_$input.on('blur', onBlur);
+	});
+
+	var m_$input;
+
+	$PUBLIC_FUN_IMPL('activate', function(){
+		m_$input[0].focus();
+	});
+
+	$PUBLIC_FUN_IMPL('deactivate', function(){
+		m_$input[0].blur();
+	});
+
+	$PUBLIC_FUN_IMPL('position', function(x,y){
+		m_$input.css({
+			'left'  : x + 'px',
+			'top'   : y + 'px',
+		});	
+	});
+
+	$PUBLIC_FUN_IMPL('setOperationSection', function(start, end, direction) {
+
+		if (typeof end == 'undefined') end = start;
+		direction = direction || 'forward';
+
+		var input = m_$input[0];
+
+		if (input.selectionStart == start &&
+			input.selectionEnd == end &&
+			input.selectionDirection == direction)
+			return;
+
+		input.selectionStart = start;
+		input.selectionEnd = end;
+		input.selectionDirection = direction;
+		
+		checkUpdate();
+	});
+
+	$PUBLIC_FUN_IMPL('setPositiveDiv', function (position_div){
+		if (position_div) m_$input.appendTo($(position_div));
+		else m_$input.detach();
+	});
+
+	var m_text = '';
+	var m_cursor_pos = 0;
+	var m_selection_start = 0;
+	var m_selection_end = 0;
+
+	function checkUpdate(e) {
+		checkTextUpdate();
+		checkCursorPosUpdate();
+		checkSelectionUpdate();
+	}
+
+	function checkTextUpdate() {
+		var text = m_$input.val();
+		if (text != m_text) {
+			m_text = text;
+			me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICATION_TEXT_CHANGED,
+				'text' : text,
+			});
+		}
+	}
+
+	function checkCursorPosUpdate() {
+		var input = m_$input[0];
+		var pos = input.selectionDirection == 'forward' ?
+			input.selectionEnd : input.selectionStart;
+		if (pos != m_cursor_pos) {
+			m_cursor_pos = pos;
+			me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICATION_CURSOR_POS_CHANGED,
+				'pos' : pos,
+			});
+		}
+
+	}
+
+	function checkSelectionUpdate() {
+		var input = m_$input[0];
+		var selection_start = input.selectionStart;
+		var selection_end = input.selectionEnd;
+		if (selection_end - selection_start == 0)
+			selection_start = selection_end = 0;
+
+		if (selection_start != m_selection_start ||
+			selection_end != m_selection_end) {
+			m_selection_start = selection_start;
+			m_selection_end = selection_end;
+			me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICATION_SELECTION_CHANGED,
+				'start' : m_selection_start,
+				'end' : m_selection_end,
+			});
+		}
+	}
+
+	function onFocus() {
+		console.log('activated');
+		me.throwNotification(
+		{
+			'id' : SELF.NOTIFICATION.NOTIFICATION_ACTIVATED,
+			'start' : m_selection_start,
+			'end' : m_selection_end,
+		});
+	}
+
+	function onBlur() {
+		console.log('deactivated');
+		me.throwNotification(
+		{
+			'id' : SELF.NOTIFICATION.NOTIFICATION_DEACTIVATED,
+			'start' : m_selection_start,
+			'end' : m_selection_end,
+		});
+	}
+
+});
+
+
+$ENUM('UI.XTextService.NOTIFICATION', [
+	'NOTIFICATION_TEXT_CHANGED',
+	'NOTIFICATION_CURSOR_POS_CHANGED',
+	'NOTIFICATION_SELECTION_CHANGED',
+	'NOTIFICATION_ACTIVATED',
+	'NOTIFICATION_DEACTIVATED',
+]);
+;
+
 (function(){
 	$CLASS('UI.XFrame', 
-	$EXTENDS(UI.IXNotificationListener),
+	$EXTENDS(UI.XEasyNotificationListener, UI.XEasyNotificationThrower),
 	function(me, SELF){
 
 		$PUBLIC_FUN([
@@ -11371,10 +11596,6 @@ function(me,SELF){
 			'paintBackground',
 			'paintForeground',
 
-			'addNotificationListener',
-			'removeNofiticationListener',
-			'throwNotification',
-
 			'getTopFrameFromPoint',
 
 			'getEventManager',
@@ -11383,13 +11604,15 @@ function(me,SELF){
 			'childToParent',
 			'parentToChild',
 			'otherFrameToThisFrame',
+			'toContainer',
+
+			'getContainer',
+			'setCursor',
 
 			'destroy',
 			'isFrameActive',
 
 			'onNotification',
-			'genRemoteRef',
-			'recycleRemoteRef',
 		]);
 
 		$MESSAGE_MAP('EVENT', 
@@ -11431,10 +11654,6 @@ function(me,SELF){
 		var m_selected_state = false;
 		var m_mouse_over = false;
 		var m_mouse_down = false;
-
-
-		var m_notification_listener = [];
-		var m_remote_ref = [];
 
 		var m_active = false;
 
@@ -12004,60 +12223,23 @@ function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
 			var parent = m_parent;
-			m_parent = NULL;
+			m_parent = null;
 			me.throwNotification({
 				'id' : SELF.NOTIFICATION.NOTIFICATION_FRAME_DETACHED_FROM_PARENT,
 				'parent' : parent
 			});
 		});
-
-		$PUBLIC_FUN_IMPL('addNotificationListener', function(listener){
-			m_notification_listener.push(listener.genRemoteRef());
-		});
-
-		$PUBLIC_FUN_IMPL('removeNofiticationListener', function(listener){
-			for (var i = 0; i < m_notification_listener.length; i++) {
-				if (m_notification_listener[i].obj == listener) {
-					listener.recycleRemoteRef(m_notification_listener[i]);
-					m_notification_listener.splice(i,1);
-					break;
-				}
-			}
-		});
-
-		$PUBLIC_FUN_IMPL('throwNotification', function(notification) {
-
-			notification.src = me.$THIS;
-
-			var notification_listeners = m_notification_listener;
-
-			for (var i = 0; i < notification_listeners.length; /*no i++*/) {
-				var r = notification_listeners[i];
-				if (r.obj) {r.obj.onNotification(notification); i++;}
-				else notification_listeners.splice(i,1);
-			}
-		});
+		
 
 		$PUBLIC_FUN_IMPL('onNotification', function(notification){
 			me.$THIS.$DISPATCH_MESSAGE('NOTIFICATION', notification);
 		});
 
-		$PUBLIC_FUN_IMPL('genRemoteRef', function(){
-			var ref = {'obj' : me.$THIS};
-			m_remote_ref.push(ref);
-			return ref;
-		});
-
-		$PUBLIC_FUN_IMPL('recycleRemoteRef', function(ref){
-			var index = m_remote_ref.indexOf(ref);
-			m_remote_ref.splice(index, 1);
-		});
-
 		$PUBLIC_FUN_IMPL('destroy', function(){
 
-			me.setVisibility(SELE.VISIBILITY.VISIBILITY_NONE);
+			me.setVisibility(SELF.Visibility.VISIBILITY_NONE);
 
-			setParent(null);
+			me.setParent(null);
 
 			while (m_child_frames.length) {
 				var frame = m_child_frames.last();
@@ -12067,9 +12249,9 @@ function(me,SELF){
 			m_last_measure_width_param.reset();
 			m_last_measure_height_param.reset();
 
-			setRect(new UI.Rect(0, 0, 0, 0));
+			me.setRect(new UI.Rect(0, 0, 0, 0));
 
-			me.setBackground(NULL);
+			me.setBackground(null);
 
 			me.setTouchable(false);
 			me.setMouseOverLayer(null);
@@ -12092,12 +12274,8 @@ function(me,SELF){
 			m_mouse_over = false;
 			m_mouse_down = false;
 
-			m_notification_listener = [];
-
-			$.each(m_remote_ref, function(i,v){
-				v.obj = null;
-			});
-			m_remote_ref = [];
+			me.clearNotificationListener();
+			me.$PARENT(UI.XEasyNotificationListener).destroy();
 
 			m_active = false;
 		});
@@ -12196,6 +12374,30 @@ function(me,SELF){
 
 			return new UI.Pt(target_pt.x - this_org_pt.x,
 				target_pt.y - this_org_pt.y);
+		});
+
+		$PUBLIC_FUN_IMPL('toContainer', function(pt_or_rect){
+			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+				var rc = pt_or_rect;
+				var left_top = me.toContainer(rc.leftTop());
+				var right_bottpm = me.toContainer(rc.rightBottom());
+				return new UI.Rect(left_top, right_bottpm);
+			}
+
+			var pt = pt_or_rect;
+
+			if (m_parent) return m_parent.toContainer(me.childToParent(pt));
+
+			return pt;
+		});
+
+		$PUBLIC_FUN_IMPL('getContainer', function(){
+			if (m_parent) return m_parent.getContainer();
+			return null;
+		});
+
+		$PUBLIC_FUN_IMPL('setCursor', function(cursor){
+			if (m_parent) m_parent.setCursor(cursor);
 		});
 
 		$PUBLIC_FUN_IMPL('measureWidth', function(param){
@@ -12598,102 +12800,6 @@ function(me,SELF){
 ;
 
 (function(){
-
-	$CLASS('UI.XResourceMgr', function(me){
-
-		$PUBLIC_FUN([
-			'addSearchPath',
-			'getResourcePath'
-		]);
-
-		var m_search_path = [];
-
-		$CONSTRUCTOR(function(){
-			me.addSearchPath('default_skin_package');
-		});
-	
-		$PUBLIC_FUN_IMPL('addSearchPath', function(path) {
-			path = trimLastSlash(path);
-			for (var i = 0; i < m_search_path.length; i++)
-				if (m_search_path[i] == path)
-					return;
-			m_search_path.push(path);
-		});
-
-		$PUBLIC_FUN_IMPL('getResourcePath', function(path, callback) {
-			// callback(path)
-			var requests = [];
-			for (var i = 0; i < m_search_path.length; i++) {
-				var info = {};
-				info.file = m_search_path[i] + '/' + path;
-				info.XHR = $.ajax({
-					'url' : info.file,
-					'method' : 'HEAD'
-				})
-				.done(function(p,q,XHR){ onRequestDone(XHR.index, true) })
-				.fail(function(XHR){ onRequestDone(XHR.index, false) });
-				info.XHR.index = requests.length;
-				requests.push(info);
-			}
-
-			function onRequestDone(index, is_found) {
-
-				if (index === null) return;
-
-				var info = requests[index];
-				info.done = true;
-				info.found = is_found;
-				for (var i = 0; i < requests.length; i++)
-					if (!requests[i].done || requests[i].found)
-						break;
-				if (i >= requests.length)
-					callback('');
-				else if (requests[i].done) {
-					callback(requests[i].file);
-					for (var i = 0; i < requests.length; i++) {
-						var XHR = requests[i].XHR;
-						XHR.index = null;
-						XHR.abort();
-					}		
-				}
-			}
-		});
-
-		function trimLastSlash(path) {
-			if (path.substr(path.length - 1) == '/')
-				return path.substr(0, path.length -1);
-			return path;
-		}
-
-	})
-	.$STATIC({
-		'instance' : resourceMgrInstance,
-		'getImage' : getImage
-	});
-
-
-	var resource_mgr_instance;
-	function resourceMgrInstance() {
-		if (!resource_mgr_instance)
-			resource_mgr_instance = new UI.XResourceMgr();
-
-		return resource_mgr_instance;
-	}
-
-	function getImage(relative_path) {
-		var img = new UI.XImageCanvasImage();
-		img.load('@' + relative_path);
-		return img;
-	}
-
-})();
-
-
-
-
-;
-
-(function(){
 	$CLASS('UI.XWindow', 
 	$EXTENDS(UI.XFrame),
 	function (me, SELF) {
@@ -12712,6 +12818,11 @@ function(me,SELF){
 			'invalidateRect',
 
 			'getEventManager',
+
+			'getContainer',
+			'setCursor',
+
+			'toContainer',
 
 			'destroy',
 		]);
@@ -12846,6 +12957,27 @@ function(me,SELF){
 
 		$PUBLIC_FUN_IMPL('getEventManager', function(){
 			return m_event_manager;
+		});
+
+		$PUBLIC_FUN_IMPL('toContainer', function(pt_or_rect){
+			if (pt_or_rect.instanceOf && pt_or_rect.instanceOf(UI.Rect)) {
+				var rect = pt_or_rect;
+				return me.$PARENT(UI.XFrame).toContainer(rect);
+			}
+			
+			var pt = pt_or_rect;
+			var window_position = m_$window_canvas.position();
+
+			return new UI.Pt(pt.x + window_position.left,
+				pt.y + window_position.top);
+		});
+
+		$PUBLIC_FUN_IMPL('getContainer', function () {
+			return m_$window_container[0];
+		});
+
+		$PUBLIC_FUN_IMPL('setCursor', function(cursor){
+			m_$window_canvas.css('cursor', cursor);
 		});
 
 		$PUBLIC_FUN_IMPL('destroy', function(){
@@ -13053,6 +13185,102 @@ function(me,SELF){
 })
 ();
 
+;
+
+(function(){
+
+	$CLASS('UI.XResourceMgr', function(me){
+
+		$PUBLIC_FUN([
+			'addSearchPath',
+			'getResourcePath'
+		]);
+
+		var m_search_path = [];
+
+		$CONSTRUCTOR(function(){
+			me.addSearchPath('default_skin_package');
+		});
+	
+		$PUBLIC_FUN_IMPL('addSearchPath', function(path) {
+			path = trimLastSlash(path);
+			for (var i = 0; i < m_search_path.length; i++)
+				if (m_search_path[i] == path)
+					return;
+			m_search_path.push(path);
+		});
+
+		$PUBLIC_FUN_IMPL('getResourcePath', function(path, callback) {
+			// callback(path)
+			var requests = [];
+			for (var i = 0; i < m_search_path.length; i++) {
+				var info = {};
+				info.file = m_search_path[i] + '/' + path;
+				info.XHR = $.ajax({
+					'url' : info.file,
+					'method' : 'HEAD'
+				})
+				.done(function(p,q,XHR){ onRequestDone(XHR.index, true) })
+				.fail(function(XHR){ onRequestDone(XHR.index, false) });
+				info.XHR.index = requests.length;
+				requests.push(info);
+			}
+
+			function onRequestDone(index, is_found) {
+
+				if (index === null) return;
+
+				var info = requests[index];
+				info.done = true;
+				info.found = is_found;
+				for (var i = 0; i < requests.length; i++)
+					if (!requests[i].done || requests[i].found)
+						break;
+				if (i >= requests.length)
+					callback('');
+				else if (requests[i].done) {
+					callback(requests[i].file);
+					for (var i = 0; i < requests.length; i++) {
+						var XHR = requests[i].XHR;
+						XHR.index = null;
+						XHR.abort();
+					}		
+				}
+			}
+		});
+
+		function trimLastSlash(path) {
+			if (path.substr(path.length - 1) == '/')
+				return path.substr(0, path.length -1);
+			return path;
+		}
+
+	})
+	.$STATIC({
+		'instance' : resourceMgrInstance,
+		'getImage' : getImage
+	});
+
+
+	var resource_mgr_instance;
+	function resourceMgrInstance() {
+		if (!resource_mgr_instance)
+			resource_mgr_instance = new UI.XResourceMgr();
+
+		return resource_mgr_instance;
+	}
+
+	function getImage(relative_path) {
+		var img = new UI.XImageCanvasImage();
+		img.load('@' + relative_path);
+		return img;
+	}
+
+})();
+
+
+
+
 
 ;
 
@@ -13163,9 +13391,6 @@ $CLASS('UI.XFrameEventMgr', function(me, SELF){
 	}
 
 	function onEvent(e) {
-
-
-
 		var offset_frame = m_$position_canvas.offset();
 		if (typeof e.pageX != 'undefined' &&
 			typeof e.pageY != 'undefined')
@@ -13746,6 +13971,8 @@ function(me, SELF){
 
 	var m_buffer = null;
 
+	var m_canvas_text = null;
+
 	$PUBLIC_FUN_IMPL('draw', function (ctx, rect_to_draw) {
 		if (!m_buffer) refreshBuffer();
 
@@ -13773,7 +14000,10 @@ function(me, SELF){
 	$PUBLIC_FUN_IMPL('setDstRect', function (rc) {
 		if (rc.equals(m_dst_rect)) return;
 
-		releaseBuffer();
+		if (rc.width() != m_dst_rect.width() ||
+			rc.height() != m_dst_rect.height())
+			releaseBuffer();
+		
 		m_dst_rect  = rc;
 	});
 
@@ -13781,9 +14011,16 @@ function(me, SELF){
 		return m_text;
 	});
 
-	$PUBLIC_FUN_IMPL('measure', function (width_limit) {
-		var canvas_text = build_canvas_text();
-		return canvas_text.measureText(m_text, width_limit);
+	$PUBLIC_FUN_IMPL('measure', function (width_limit, start /* = 0 */, count /* = m_text.length */) {
+
+		var text = m_text;
+
+		if (typeof start != 'undefined')
+			if (typeof count != 'undefined') text = m_text.substr(start, count);
+			else text = m_text.substr(start);
+
+		var canvas_text = get_canvas_text();
+		return canvas_text.measureText(text, width_limit);
 	});
 
 	$PUBLIC_FUN_IMPL('setText', function (text) {
@@ -13801,13 +14038,18 @@ function(me, SELF){
 			return;
 
 		releaseBuffer();
+
 		m_face = face;
 		m_size = size;
 		m_style = style;
+
+		m_canvas_text = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setColor', function (color) {
 		m_color = color;
+
+		m_canvas_text = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setAlignment', function (halign, valign) {
@@ -13831,7 +14073,7 @@ function(me, SELF){
 		m_buffer.width = m_dst_rect.width();
 		m_buffer.height = m_dst_rect.height();
 
-		var canvas_text = build_canvas_text();
+		var canvas_text = get_canvas_text();
 
 		canvas_text.draw(m_buffer.getContext('2d'),
 			m_text, 
@@ -13841,20 +14083,23 @@ function(me, SELF){
 		);
 	}
 
-	function build_canvas_text () {
-		var canvas_text = new UI.XCanvasText();
-		canvas_text.setFontFace(m_face);
-		canvas_text.setFontSize(m_size);
-		canvas_text.setFontColor(m_color);
+	function get_canvas_text () {
 
-		canvas_text.setBold(
-			!!(m_style & SELF.Style.STYLE_BOLD)
-		);
-		canvas_text.setItalic(
-			!!(m_style & SELF.Style.STYLE_ITARIC)
-		);
+		if (!m_canvas_text) {
+			m_canvas_text = new UI.XCanvasText();
+			m_canvas_text.setFontFace(m_face);
+			m_canvas_text.setFontSize(m_size);
+			m_canvas_text.setFontColor(m_color);
 
-		return canvas_text;
+			m_canvas_text.setBold(
+				!!(m_style & SELF.Style.STYLE_BOLD)
+			);
+			m_canvas_text.setItalic(
+				!!(m_style & SELF.Style.STYLE_ITARIC)
+			);
+		}
+
+		return m_canvas_text;
 	}
 
 
@@ -13972,7 +14217,10 @@ function(me, SELF){
 		if (m_dst_rect.equals(rc))
 			return;
 
-		releaseBuffer();
+		if (rc.width() != m_dst_rect.width() ||
+			rc.height() != m_dst_rect.height())
+			releaseBuffer();
+		
 		m_dst_rect = rc;
 	});
 
@@ -14385,23 +14633,35 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	$PUBLIC_FUN_IMPL('setFontFace', function (face) {
 		face = normalFontFace(face);
 		m_font_face = face;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setFontSize', function (size) {
 		m_font_size = size - 0;
 		m_line_height = Math.round(size * m_line_height_mutiplier);
+
+		m_measure_canvas = null;
 	});
 
 	$PUBLIC_FUN_IMPL('setLineHeight', function (size) {
 		m_line_height = size - 0;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setFontColor', function (color) {
 		m_font_color = color;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setBold', function (b) {
 		m_bold = b;
+
+		m_measure_canvas = null;
 	});
 	$PUBLIC_FUN_IMPL('setItalic', function (b) {
 		m_italic = b;
+
+		m_measure_canvas = null;
 	});	
 
 	function getYStart(valign, line_count, height) {
@@ -14429,6 +14689,10 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	function stringToLines(string, max_width, ctx) {
 
 		var lines = [];
+
+		if (max_width == Number.POSITIVE_INFINITY)
+			return [{'text' : string, 'width' : ctx.measureText(string).width}];
+
 		var words = stringToWordArray(string);
 
 		var line = null;
@@ -14461,13 +14725,14 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 	}
 
 	$PUBLIC_FUN_IMPL('measureText', function(text, width_limit){
-		if (!m_measure_canvas)
+		
+		var ctx = null;
+		if (!m_measure_canvas) {
 			m_measure_canvas = document.createElement('canvas');
-
-		var ctx = m_measure_canvas.getContext('2d');
-		ctx.save();
-		prepareCtxFont(ctx);
-
+			ctx = m_measure_canvas.getContext('2d');
+			prepareCtxFont(ctx);
+		} else ctx = m_measure_canvas.getContext('2d');
+			
 		var lines = stringToLines(text, width_limit, ctx);
 
 		var max_x = 0, max_y = 0;
@@ -14476,8 +14741,6 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 			max_x = Math.max(max_x, v.width);
 		});
 		max_y = lines.length * m_line_height;
-
-		ctx.restore();
 
 		return new UI.Size(max_x, max_y);
 	});
@@ -14729,8 +14992,6 @@ $CLASS('UI.XCanvasImage', function(me){
 					cureent_end_y = end.y;
 				}
 
-				console.log(ops[op], current_end_x, cureent_end_y);
-
 				ctx[ops[op]](current_end_x, cureent_end_y);
 
 				current_end += DOTTED_LEN;
@@ -14919,7 +15180,7 @@ $CLASS('UI.XCanvasImage', function(me){
 
 		function refreshButtonFace() {
 			var background = me.getBackground();
-			if (!background.isImageLoaded()) return;
+			if (!background || !background.isImageLoaded()) return;
 
 			var state = m_disabled ? 
 				SELF.BtnState.BTN_DISABLED : SELF.BtnState.BTN_NORMAL;
@@ -15733,6 +15994,8 @@ $CLASS('UI.XCanvasImage', function(me){
 
 		function UpdateLeftMarginOfChildItemContainer() {
 
+			if (!m_child_item_frame_container) return;
+
 			var child_margin_left = m_child_indent;
 
 			child_margin_left += m_root_item_frame_container.getRect().left;
@@ -15793,6 +16056,133 @@ $CLASS('UI.XCanvasImage', function(me){
 
 
 })();
+;
+
+$CLASS('UI.XScrollView',
+$EXTENDS(UI.XFrame),
+function(me, SELF) {
+
+	$PUBLIC_FUN([
+		'onMeasureWidth',
+		'onMeasureHeight',
+
+		'onLayout',
+
+		'destroy', 
+	]);
+
+	var m_max_x = 0;
+	var m_max_y = 0;
+
+	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+		var measured_width = 
+			onMeasureLayoutDirection(param, 
+				'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
+		me.setMeasuredWidth(measured_width);
+	});
+
+	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+		var measured_height =
+			onMeasureLayoutDirection(param,
+				'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
+		me.setMeasuredHeight(measured_height);
+	});
+
+	$PUBLIC_FUN_IMPL('onLayout', function(param){
+
+		var max_x = 0, max_y = 0;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+			var layout_param = cur.getLayoutParam();
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var rect = new UI.Rect(layout_param.x, layout_param.y,
+				layout_param.x + cur.getMeasuredWidth(),
+				layout_param.y + cur.getMeasuredHeight());
+
+			max_x = Math.max(max_x, rect.right);
+			max_y = Math.max(max_y, rect.bottom);
+
+			cur.layout(rect);
+		}
+
+		handleMaxXY(max_x, max_y);
+	});
+
+	$PUBLIC_FUN_IMPL('destroy', function(){
+		me.$PARENT(UI.XFrame).destroy();
+		m_max_x = m_max_y = 0;
+	});
+
+	function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
+			layout_param_pos, layout_param_size, layout_margin_end) {
+
+		var measured = 0;
+		if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+			measured = param.num;
+
+		var frame_count = me.getFrameCount();
+		for (var i = 0; i < frame_count; i++) {
+			var cur = me.getFrameByIndex(i);
+
+			var layout_param = cur.getLayoutParam();
+
+			if (cur.getVisibility() == 
+				SELF.Visibility.VISIBILITY_NONE)
+				continue;
+
+			var param_for_measure = new SELF.MeasureParam();
+
+			switch (layout_param[layout_param_size]) {
+				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
+					param_for_measure.num = 0;
+					break;
+				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = max(0, 
+						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
+					break;
+				default:
+					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+					param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
+					break;
+			}
+
+			cur[child_measure_proc](param_for_measure);
+		}
+
+		return measured;
+	}
+
+	function handleMaxXY(max_x, max_y) {
+		if (m_max_x == max_x &&
+			m_max_y == max_y)
+			return;
+
+		var old = {max_x: m_max_x, max_y: m_max_y};
+		m_max_x = max_x;
+		m_max_y = max_y;
+
+		me.throwNotification(
+			{
+				'id' : SELF.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED,
+				new : {
+					'max_x' : m_max_x,
+					'max_y' : m_max_y,
+				},
+				old : old
+			});
+	}
+});
+
+$ENUM('UI.XScrollView.NOTIFICATION', [
+	'NOTIFICAITON_BOUND_CHANGED',
+]);
 ;
 
 (function() {
@@ -15933,131 +16323,287 @@ $CLASS('UI.XCanvasImage', function(me){
 })();
 ;
 
-$CLASS('UI.XScrollView',
-$EXTENDS(UI.XFrame),
-function(me, SELF) {
+(function(){
 
-	$PUBLIC_FUN([
-		'onMeasureWidth',
-		'onMeasureHeight',
 
-		'onLayout',
+	$CLASS('UI.XScrollFrame',
+	$EXTENDS(UI.XFrame),
+	function(me, SELF){
 
-		'destroy', 
-	]);
+		$PUBLIC_FUN([
+			'create',
+			'destroy',
 
-	var m_max_x = 0;
-	var m_max_y = 0;
+			'addContentFrame',
+			'getContentFrameCount',
+			'removeContentFrame',
 
-	$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-		var measured_width = 
-			onMeasureLayoutDirection(param, 
-				'measureWidth', 'getMeasuredWidth', 'x', 'width', 'margin_right');
-		me.setMeasuredWidth(measured_width);
-	});
+			'onMeasureWidth',
+			'onMeasureHeight',
 
-	$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-		var measured_height =
-			onMeasureLayoutDirection(param,
-				'measureHeight', 'getMeasuredHeight', 'y', 'height', 'margin_bottom');
-		me.setMeasuredHeight(measured_height);
-	});
+			'onLayout',
 
-	$PUBLIC_FUN_IMPL('onLayout', function(param){
+			'handleXMLChildNode',
+		]);
 
-		var max_x = 0, max_y = 0;
+		$MESSAGE_MAP('NOTIFICATION', 
+		[
+			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onViewRectChanged'),
+			$MAP(UI.XScrollView.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED, 'onContentRectChanged'),
+			$MAP(UI.XScrollBar.NOTIFICATION.NOTIFICATION_SCROLLCHANGED, 'onScrollChanged'),
+			$CHAIN(UI.XFrame),
+		]);
 
-		var frame_count = me.getFrameCount();
-		for (var i = 0; i < frame_count; i++) {
-			var cur = me.getFrameByIndex(i);
-			var layout_param = cur.getLayoutParam();
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
-				continue;
+		$MESSAGE_MAP('EVENT', 
+		[
+			$MAP('mouseup', 'onMouseUp'),
+			$CHAIN(UI.XFrame),
+		]);
 
-			var rect = new UI.Rect(layout_param.x, layout_param.y,
-				layout_param.x + cur.getMeasuredWidth(),
-				layout_param.y + cur.getMeasuredHeight());
+		var m_scroll_bar;
+		var m_scroll_bar_h = null;
+		var m_scroll_bar_v = null;
+		var m_view = null;
 
-			max_x = Math.max(max_x, rect.right);
-			max_y = Math.max(max_y, rect.bottom);
+		var m_scroll_h_height = 15;
+		var m_scroll_v_width = 15;
 
-			cur.layout(rect);
-		}
+		$CONSTRUCTOR(function(scroll_bar){
+			m_scroll_bar = scroll_bar;
+		});
 
-		handleMaxXY(max_x, max_y);
-	});
+		$PUBLIC_FUN_IMPL('create', function(
+			parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
+			bg_h /* = null*/, fg_h /* = null*/, bg_v /* = null*/, fg_v /* = null */){
 
-	$PUBLIC_FUN_IMPL('destroy', function(){
-		me.$PARENT(UI.XFrame).destroy();
-		m_max_x = m_max_y = 0;
-	});
+			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
 
-	function onMeasureLayoutDirection(param, child_measure_proc, child_get_measured_proc,
-			layout_param_pos, layout_param_size, layout_margin_end) {
-
-		var measured = 0;
-		if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-			measured = param.num;
-
-		var frame_count = me.getFrameCount();
-		for (var i = 0; i < frame_count; i++) {
-			var cur = me.getFrameByIndex(i);
-
-			var layout_param = cur.getLayoutParam();
-
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
-				continue;
-
-			var param_for_measure = new SELF.MeasureParam();
-
-			switch (layout_param[layout_param_size]) {
-				case SELF.LayoutParam.SpecialMetrics.METRIC_WRAP_CONTENT:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_UNRESTRICTED;
-					param_for_measure.num = 0;
-					break;
-				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = max(0, 
-						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
-					break;
-				default:
-					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = Math.max(0, layout_param[layout_param_size]);
-					break;
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H) && !m_scroll_bar_h) {
+				m_scroll_bar_h = new UI.XScrollBar();
+				m_scroll_bar_h.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_H,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_h, fg_h);
+				m_scroll_bar_h.addNotificationListener(me.$THIS);
 			}
 
-			cur[child_measure_proc](param_for_measure);
+			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V) && !m_scroll_bar_v) {
+				m_scroll_bar_v = new UI.XScrollBar();
+				m_scroll_bar_v.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_V,
+					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_v, fg_v);
+				m_scroll_bar_v.addNotificationListener(me.$THIS);
+			}
+
+			if (!m_view) {
+				m_view = new UI.XScrollView();
+				m_view.create(me.$THIS, me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW);
+				m_view.addNotificationListener(me.$THIS);
+			}
+		});
+
+		$PUBLIC_FUN_IMPL('destroy', function(){
+			m_view = m_scroll_bar_h = m_scroll_bar_v = null;
+			me.$PARENT(UI.XFrame).destroy();
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_view.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+				param_for_measure.num = m_scroll_v_width;
+				m_scroll_bar_v.measureWidth(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_v_width);
+				m_scroll_bar_h.measureWidth(param_for_measure);
+			}
+
+			me.setMeasuredWidth(measured);
+
+		});
+
+		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
+			var measured = 0;
+			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
+				measured = param.num;
+
+			var param_for_measure = new SELF.MeasureParam();
+			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
+
+			if (m_view) {
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_view.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_v) {
+
+				param_for_measure.num = measured;
+				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
+					param_for_measure.num = Math.max(0, 
+						param_for_measure.num - m_scroll_h_height);
+				m_scroll_bar_v.measureHeight(param_for_measure);
+			}
+
+			if (m_scroll_bar_h) {
+				param_for_measure.num = m_scroll_h_height;
+				m_scroll_bar_h.measureHeight(param_for_measure);
+			}
+
+			me.setMeasuredHeight(measured);
+		});
+
+		$PUBLIC_FUN_IMPL('onLayout', function(rc){
+
+			var width = rc.width();
+			var height = rc.height();
+
+			if (m_view)
+				m_view.layout(new UI.Rect(0, 0, 
+					m_view.getMeasuredWidth(), m_view.getMeasuredHeight()));
+			if (m_scroll_bar_v)
+				m_scroll_bar_v.layout(new UI.Rect(
+					width - m_scroll_bar_v.getMeasuredWidth(), 0,
+					width, m_scroll_bar_v.getMeasuredHeight()));
+			if (m_scroll_bar_h)
+				m_scroll_bar_h.layout(new UI.Rect(
+					0, height - m_scroll_bar_h.getMeasuredHeight(),
+					m_scroll_bar_h.getMeasuredWidth(), height));
+
+		});
+
+		$PUBLIC_FUN_IMPL('addContentFrame', function(frame){
+			m_view.addFrame(frame);
+		});
+
+		$PUBLIC_FUN_IMPL('getContentFrameCount', function(){
+			return m_view.getFrameCount();
+		});
+
+		$PUBLIC_FUN_IMPL('removeContentFrame', function(index){
+			return m_view.removeFrame(index);
+		});
+
+		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node) {
+			for (var i = 0; i < xml_node.childNodes.length; i++) {
+				var c = xml_node.childNodes[i];
+				// node element. 
+				if (c.nodeType != 1) continue; 
+				UI.XFrameXMLFactory.instance().buildFrame(c, m_view);
+			}
+		});
+
+		$MESSAGE_HANDLER('onViewRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
+				n.old.width(), n.old.height());
+		});
+
+		$MESSAGE_HANDLER('onContentRectChanged', function(n){
+			if (n.src != m_view) return;
+			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
+				n.old.max_x, n.old.max_y);
+		});
+
+		$MESSAGE_HANDLER('onScrollChanged', function(n){
+			if (n.src == m_scroll_bar_h) {
+				m_view.setScrollX(n.pos);
+			}
+
+			if (n.src == m_scroll_bar_v) {
+				m_view.setScrollY(n.pos);
+			}
+
+		});
+
+		$MESSAGE_HANDLER('onMouseUp', function(e){
+			if (m_scroll_bar_v && 
+				m_scroll_bar_v.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_v.getFocus();
+			else if (m_scroll_bar_h && 
+				m_scroll_bar_h.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
+				m_scroll_bar_h.getFocus();
+		});
+
+		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
+			if (m_scroll_bar_v && old_h != h)
+				m_scroll_bar_v[fn](h);
+			if (m_scroll_bar_h && old_w != w)
+				m_scroll_bar_h[fn](w);
 		}
 
-		return measured;
+	
+	})
+	.$STATIC({
+		'buildFromXML' : buildFromXML,
+	});
+
+	$ENUM('UI.XScrollFrame.ScrollBar', {
+		'SCROLL_BAR_H' : 1,
+		'SCROLL_BAR_V' : 2,
+	});
+
+	function buildFromXML(xml_node, parent) {
+
+		var layout_param = parent ?
+			parent.generateLayoutParam(xml_node) :
+			new UI.XFrame.LayoutParam(xml_node);
+
+		var scroll_bar = 0;
+		var bar_bg_h = null;
+		var bar_fg_h = null;
+		var bar_bg_v = null;
+		var bar_fg_v = null;
+
+		if ((xml_node.getAttribute('h_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_H;
+		if ((xml_node.getAttribute('v_scroll') || '').toLowerCase() == 'true')
+			scroll_bar |= this.ScrollBar.SCROLL_BAR_V;
+
+		if (!scroll_bar) {
+			UI.XFrameXMLFactory
+				.reportError('WARNING: No scroll bar specified for the scroll frame. Create the scroll frame failed. ');
+			return null;
+		}
+
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_H) {
+			bar_bg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_bg", null, "3partH", "scroll_bar_h_bg_part_");
+			bar_fg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_fg", null, "3partH", "scroll_bar_h_fg_part_");
+		}
+		if (scroll_bar & this.ScrollBar.SCROLL_BAR_V) {
+			bar_bg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_bg", null, "3partV", "scroll_bar_v_bg_part_");
+			bar_fg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_fg", null, "3partV", "scroll_bar_v_fg_part_");
+		}
+
+		var frame = new this(scroll_bar);
+		frame.create(parent, layout_param, 
+			UI.XFrame.Visibility.VISIBILITY_NONE,
+			bar_bg_h, bar_fg_h, bar_bg_v, bar_fg_v);
+
+		return frame;
+
 	}
 
-	function handleMaxXY(max_x, max_y) {
-		if (m_max_x == max_x &&
-			m_max_y == max_y)
-			return;
 
-		var old = {max_x: m_max_x, max_y: m_max_y};
-		m_max_x = max_x;
-		m_max_y = max_y;
 
-		me.throwNotification(
-			{
-				'id' : SELF.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED,
-				new : {
-					'max_x' : m_max_x,
-					'max_y' : m_max_y,
-				},
-				old : old
-			});
-	}
-});
-
-$ENUM('UI.XScrollView.NOTIFICATION', [
-	'NOTIFICAITON_BOUND_CHANGED',
-]);
+})();
 ;
 
 (function(){
@@ -16172,7 +16718,7 @@ $ENUM('UI.XScrollView.NOTIFICATION', [
 
 			m_current_frame = 0;
 
-			if (m_frames.isImageLoaded()) {
+			if (m_frames && m_frames.isImageLoaded()) {
 				me.invalidateLayout();
 				switchFrame();
 			}
@@ -16283,6 +16829,476 @@ $ENUM('UI.XScrollView.NOTIFICATION', [
 })();
 
 
+;
+
+$CLASS('UI.XEdit',
+$EXTENDS(UI.XFrame),
+function(me, SELF) {
+
+	$PUBLIC_FUN([
+		'create',
+		'destory',
+
+		'paintBackground',
+		'paintForeground',
+
+		'onAttachedToParent',
+		'onDetachedFromParent',
+	]);
+
+	$MESSAGE_MAP('NOTIFICATION', 
+	[
+		$MAP(UI.XTextService.NOTIFICATION.NOTIFICATION_TEXT_CHANGED, 'onTextChanged'),
+		$MAP(UI.XTextService.NOTIFICATION.NOTIFICATION_CURSOR_POS_CHANGED, 'onCursorPosChanged'),
+		$MAP(UI.XTextService.NOTIFICATION.NOTIFICATION_SELECTION_CHANGED, 'onSelectionChanged'),
+		$MAP(UI.XTextService.NOTIFICATION.NOTIFICATION_ACTIVATED, 'onServiceActivated'),
+		$MAP(UI.XTextService.NOTIFICATION.NOTIFICATION_DEACTIVATED, 'onServiceDeactived'),
+		$CHAIN(UI.XFrame),
+	]);
+
+	$MESSAGE_MAP('EVENT', 
+	[
+		$MAP(UI.EVENT_ID.EVENT_TIMER, 'onTimer'),
+		$MAP('mousedown', 'onMouseDown'),
+		$MAP('mouseup', 'onMouseUp'),
+		$MAP('mousemove', 'onMouseMove'),
+		$MAP('mouseleave', 'onMouseLeave'),
+		$MAP('mouseenter', 'onMouseEnter'),
+		$CHAIN(UI.XFrame),
+	]);
+
+	var m_text_service = null;
+
+	var m_cursor_pos = 0;
+	var m_cursor_visible = true;
+	var m_cursor_timer = null;
+
+	var m_auto_scroll_timer = null;
+	var m_auto_scroll_last_time = null;
+	var m_auto_scroll_accumulated_dis = 0;
+
+	var m_selection_start = 0;
+	var m_selection_end = 0;
+
+	var m_scroll = 0;
+
+	var m_text = null;
+	var m_text_reversed = null;
+	var m_text_width_array = [];
+
+	var m_active = false;
+
+	var m_mousedown = false;
+	var m_mouse_down_pos = 0;
+	var m_mouse_move_pt = 0;
+
+	var CURSOR_WIDTH = 1;
+	var CURSOR_BLINK_INTERVAL = 500;
+	var AUTO_SCROLL_CHECK_INTERVAL = 10;
+	var AUTO_SCROLL_RATE = 1 / 500; // step/ms
+
+	$PUBLIC_FUN_IMPL('create', function(parent, layout, 
+		visibility /* = SELF.Visibility.VISIBILITY_NONE*/) {
+
+		m_text_service = new UI.XTextService(me.getContainer);
+		m_text_service.addNotificationListener(me.$THIS);
+		m_text = new UI.XTextCanvasText();
+		m_text_reversed = new UI.XTextCanvasText();
+		m_text_reversed.setColor('#FFF');
+
+		me.$PARENT(UI.XFrame).create(parent, layout, visibility);
+	});
+
+
+	$PUBLIC_FUN_IMPL('destory', function(){
+		me.$PARENT(UI.XFrame).destory();
+
+		m_text_service.removeNofiticationListener(me.$THIS);
+		m_text_service = null;
+		m_text = null;
+		m_text_reversed = null;
+
+		if (m_cursor_timer !== null) {
+			UI.XEventService.instance().killTimer(m_cursor_timer);
+			m_cursor_timer = null;
+		}
+
+		if (m_auto_scroll_timer !== null) {
+			UI.XEventService.instance().killTimer(m_auto_scroll_timer);
+			m_auto_scroll_timer = null;
+		}
+	});
+
+	$PUBLIC_FUN_IMPL('paintBackground', function(ctx, rect){
+
+		ctx.save();
+
+		ctx.fillStyle = '#FFF';
+		ctx.fillRect(rect.left, rect.top, rect.width(), rect.height());
+
+
+		ctx.restore();
+	});
+
+	$PUBLIC_FUN_IMPL('paintForeground', function(ctx, rc){
+
+		var rect = new UI.Rect(rc);
+
+		ctx.save();
+
+		ctx.translate(-m_scroll, 0);
+		rect.offset(m_scroll, 0);
+
+		m_text.draw(ctx, rect);
+
+		if (m_selection_end - m_selection_start) {
+			var selection_rect = new UI.Rect(getWidthFromPos(m_selection_start), 0,
+				getWidthFromPos(m_selection_end), me.getRect().height());
+			var selection_rect_real
+				= rect.intersect(selection_rect);
+			if (!selection_rect_real.isEmpty()) {
+				
+				ctx.fillStyle = m_active ? 'rgb(50, 142, 253)' : 'rgb(199, 199, 199)';
+				var text_drawer =  m_active ? m_text_reversed : m_text;
+
+				ctx.fillRect(selection_rect_real.left, selection_rect_real.top,
+					selection_rect_real.width(), selection_rect_real.height());
+				text_drawer.draw(ctx, selection_rect_real);
+			}
+		}
+
+		if (m_active && m_cursor_visible) {
+			var cursor_rect_real 
+				= rect.intersect(getCursorRect());
+			if (!cursor_rect_real.isEmpty()) {
+				ctx.fillStyle = '#000';
+				ctx.fillRect(cursor_rect_real.left, cursor_rect_real.top,
+						cursor_rect_real.width(), cursor_rect_real.height());
+			}
+		}
+
+		ctx.restore();
+
+		me.$PARENT(UI.XFrame).paintForeground();
+
+	});
+
+
+
+	$PUBLIC_FUN_IMPL('onAttachedToParent', function(parent){
+		me.$PARENT(UI.XFrame).onAttachedToParent(parent);
+		m_text_service.setPositiveDiv(me.getContainer());
+	});
+
+	$PUBLIC_FUN_IMPL('onDetachedFromParent', function(){
+		me.$PARENT(UI.XFrame).onDetachedFromParent();
+		m_text_service.setPositiveDiv(null);
+	});
+
+	$MESSAGE_HANDLER('onServiceActivated', function(n){
+		if (n.src != m_text_service) return;
+
+		updateServicePostion();
+
+		m_cursor_timer = 
+			UI.XEventService.instance().setTimer(me.$THIS, CURSOR_BLINK_INTERVAL);
+
+		m_active = true;
+
+		return true;
+	});
+
+	$MESSAGE_HANDLER('onServiceDeactived', function(n){
+		if (n.src != m_text_service) return;
+
+		m_active = false;
+
+		UI.XEventService.instance().killTimer(m_cursor_timer);
+		m_cursor_timer = null;
+
+		// me.invalidateRect(getCursorRenderRect());
+
+		// optimise here. 
+		me.invalidateRect();
+
+		return true;
+	});
+
+	
+
+	$MESSAGE_HANDLER('onMouseDown', function(e){
+
+		m_text_service.activate();
+
+		var x = e.UI_pt.x + m_scroll;
+		var pos = getPosFromWidth(x);
+		m_mouse_down_pos = pos;
+
+		if (pos != m_cursor_pos)
+			m_text_service.setOperationSection(pos);
+
+		m_auto_scroll_timer = 
+			UI.XEventService.instance().setTimer(me.$THIS, AUTO_SCROLL_CHECK_INTERVAL);
+
+		me.getEventManager().captureMouse(me.$THIS);
+		m_mousedown = true;
+
+		return true;
+	});
+
+	$MESSAGE_HANDLER('onMouseUp', function(e) {
+
+		m_mouse_down_pos = 0;
+
+		UI.XEventService.instance().killTimer(m_auto_scroll_timer);
+		m_auto_scroll_timer = null;
+		m_auto_scroll_last_time = null;
+		m_auto_scroll_accumulated_dis = 0;
+
+		me.getEventManager().releaseCaptureMouse(me.$THIS);
+		m_mousedown = false;
+
+		return true;
+	});
+
+	$MESSAGE_HANDLER('onMouseMove', function(e){
+
+		if (!m_mousedown) return;
+		
+		m_mouse_move_pt = e.UI_pt;
+
+		updateOperationSection();
+	});
+
+	$MESSAGE_HANDLER('onMouseLeave', function(e){
+		me.setCursor('auto');
+	});
+
+	$MESSAGE_HANDLER('onMouseEnter', function(e){
+		me.setCursor('text');
+	});
+
+	$MESSAGE_HANDLER('onTimer', function(e){
+
+		if (e.timer_id == m_cursor_timer)
+			return onCursorTimer();
+		if (e.timer_id == m_auto_scroll_timer)
+			return onAutoScrollTimer();
+
+		return false;
+	
+	});
+
+	$MESSAGE_HANDLER('onTextChanged', function(n){
+
+		var old_text = m_text.getText();
+		var old_text_width_arr = m_text_width_array;
+
+		var new_text = n.text;
+		m_text.setText(new_text);
+		m_text_reversed.setText(new_text);
+		m_text_width_array = [];
+		for (var i = 0; i < old_text.length && i < new_text.length; i++)
+			if (old_text[i] == new_text[i]) m_text_width_array[i] = old_text_width_arr[i];
+			else break;
+		
+		m_text.setDstRect(new UI.Rect(0, 0, 
+			getWidthFromPos(new_text.length), me.getRect().height()));
+		m_text_reversed.setDstRect(new UI.Rect(0, 0, 
+			getWidthFromPos(new_text.length), me.getRect().height()));
+
+
+		updateScroll();
+
+		// TODO: optimise here. 
+		me.invalidateRect();
+	});
+
+	$MESSAGE_HANDLER('onCursorPosChanged', function(n){
+		updateCursor(n.pos);
+	});
+
+	$MESSAGE_HANDLER('onSelectionChanged', function(n){
+		m_selection_start = n.start;
+		m_selection_end = n.end;
+
+		// TODO: optimise here.
+		me.invalidateRect();
+	});
+
+	function onCursorTimer() {
+		m_cursor_visible = !m_cursor_visible;
+		me.invalidateRect(getCursorRenderRect());
+		return true;
+	}
+
+	function onAutoScrollTimer() {
+
+		if (m_auto_scroll_last_time == null) {
+			m_auto_scroll_last_time = new Date().getTime();
+			return;
+		}
+
+		var self_width = me.getRect().width();
+
+		var now = new Date().getTime();
+		var esc = now - m_auto_scroll_last_time;
+		var step = 0;
+
+		if (m_mouse_move_pt.x >= self_width)
+			step = m_mouse_move_pt.x - self_width + 1;
+		else if (m_mouse_move_pt.x < 0)
+			step = m_mouse_move_pt.x;
+
+		m_auto_scroll_accumulated_dis 
+			+= AUTO_SCROLL_RATE * esc * step;
+
+		var integer_dis = Math.realFloor(m_auto_scroll_accumulated_dis);
+		if (integer_dis) {
+			scrollBy(integer_dis);
+			m_auto_scroll_accumulated_dis -= integer_dis;
+		}
+			
+		m_auto_scroll_last_time = now;
+
+		return true;
+	}
+
+	function scrollBy(dis) {
+
+		var self_width = me.getRect().width();
+		var text_width_with_cursor = 
+			getWidthFromPos(m_text.getText().length) + CURSOR_WIDTH;
+
+		if (m_scroll + dis < 0) dis = -m_scroll;
+		else if (text_width_with_cursor - (m_scroll + dis) < self_width) 
+			dis = -m_scroll + Math.max(text_width_with_cursor - self_width, 0);
+
+		if (!dis) return;
+
+		m_scroll += dis;
+		me.invalidateRect();
+
+		updateOperationSection();
+	}
+
+	function updateCursor(cursor_pos) {
+
+		if (m_cursor_pos == cursor_pos) return;
+
+		var old_cursor_rect = getCursorRenderRect();
+
+		m_cursor_pos = cursor_pos;
+
+		me.invalidateRect(old_cursor_rect);
+		me.invalidateRect(getCursorRenderRect());
+
+		updateServicePostion();
+
+		updateScroll();		
+	}
+
+	function updateScroll() {
+
+		var self_width = me.getRect().width();
+		var text_width_with_cursor = 
+			getWidthFromPos(m_text.getText().length) + CURSOR_WIDTH;
+
+		var cursor_render_pos = getWidthFromPos(m_cursor_pos) - m_scroll;
+		if (cursor_render_pos < 0)
+			m_scroll += cursor_render_pos;
+		else if (cursor_render_pos >= self_width)
+			m_scroll += cursor_render_pos - self_width + 1;
+		else if (text_width_with_cursor - m_scroll < self_width)
+			m_scroll = Math.max(text_width_with_cursor - self_width, 0);
+		else
+			return;
+
+		me.invalidateRect();
+		updateServicePostion();
+	}
+
+	function updateServicePostion() {
+		var pt = me.toContainer(new UI.Pt(0, me.getRect().height()));
+		m_text_service.position(pt.x + getWidthFromPos(m_cursor_pos) - m_scroll, pt.y);
+	}
+
+	function updateOperationSection() {
+
+		var self_width = me.getRect().width();
+
+		var mouse_move_x = m_mouse_move_pt.x;
+		if (mouse_move_x >= self_width)
+			mouse_move_x = self_width - 1;
+		else if (mouse_move_x < 0)
+			mouse_move_x = 0;
+
+		var mouse_move_pos = 
+			getPosFromWidth(mouse_move_x + m_scroll);
+
+		var start = Math.min(m_mouse_down_pos, mouse_move_pos);
+		var end = Math.max(m_mouse_down_pos, mouse_move_pos);
+		var direction = m_mouse_down_pos <= mouse_move_pos ? 'forward' : 'backward';
+
+		m_text_service.setOperationSection(start, end, direction);
+	}
+
+	function getCursorRect() {
+		var pos_width = getWidthFromPos(m_cursor_pos);
+		return new UI.Rect(pos_width, 0, 
+			pos_width + CURSOR_WIDTH, me.getRect().height());
+	}
+
+	function getCursorRenderRect() {
+		return getCursorRect().offset(-m_scroll, 0);
+	}
+
+	function getWidthFromPos(pos) {
+
+		var text = m_text.getText();
+
+		if (pos > text.length) pos = text.length;
+		else if (pos < 0) pos = 0;
+		if (typeof m_text_width_array[pos] != 'undefined')
+			return m_text_width_array[pos];
+
+		return m_text_width_array[pos] = m_text
+			.measure(UI.XTextCanvasText.UNLIMITED, 0, pos).w;
+	}
+
+	function getPosFromWidth(width) {
+		
+		var text = m_text.getText();
+
+		var l = 0;
+		var r = text.length + 1;
+
+		while (l <= r) {
+
+			var m = Math.floor((l + r) / 2);
+
+			var lb,rb;			
+			if (m - 1 < 0) lb = Number.NEGATIVE_INFINITY;
+			else lb = getWidthFromPos(m - 1);
+			if (m > text.length) rb = Number.POSITIVE_INFINITY;
+			else rb = getWidthFromPos(m);
+
+			if (width >= lb && width < rb) {
+				if (Math.abs(width - lb) > Math.abs(width - rb))
+					return m;
+				return m - 1;
+			}
+
+			if (width < lb) {
+				r = m - 1;
+			} else {
+				l = m + 1;
+			}
+		}
+
+	}
+
+});
 ;
 
 $CLASS('UI.XScrollBar',
@@ -16604,286 +17620,3 @@ $ENUM('UI.XScrollBar.NOTIFICATION',
 ]);
 
 
-;
-
-(function(){
-
-
-	$CLASS('UI.XScrollFrame',
-	$EXTENDS(UI.XFrame),
-	function(me, SELF){
-
-		$PUBLIC_FUN([
-			'create',
-			'destroy',
-
-			'addContentFrame',
-			'getContentFrameCount',
-			'removeContentFrame',
-
-			'onMeasureWidth',
-			'onMeasureHeight',
-
-			'onLayout',
-
-			'handleXMLChildNode',
-		]);
-
-		$MESSAGE_MAP('NOTIFICATION', 
-		[
-			$MAP(UI.XFrame.NOTIFICATION.NOTIFICAITON_FRAME_RECT_CHANGED, 'onViewRectChanged'),
-			$MAP(UI.XScrollView.NOTIFICATION.NOTIFICAITON_BOUND_CHANGED, 'onContentRectChanged'),
-			$MAP(UI.XScrollBar.NOTIFICATION.NOTIFICATION_SCROLLCHANGED, 'onScrollChanged'),
-			$CHAIN(UI.XFrame),
-		]);
-
-		$MESSAGE_MAP('EVENT', 
-		[
-			$MAP('mouseup', 'onMouseUp'),
-			$CHAIN(UI.XFrame),
-		]);
-
-		var m_scroll_bar;
-		var m_scroll_bar_h = null;
-		var m_scroll_bar_v = null;
-		var m_view = null;
-
-		var m_scroll_h_height = 15;
-		var m_scroll_v_width = 15;
-
-		$CONSTRUCTOR(function(scroll_bar){
-			m_scroll_bar = scroll_bar;
-		});
-
-		$PUBLIC_FUN_IMPL('create', function(
-			parent, layout, visibility/* = UI.XFrame.Visibility.VISIBILITY_NONE*/,
-			bg_h /* = null*/, fg_h /* = null*/, bg_v /* = null*/, fg_v /* = null */){
-
-			me.$PARENT(UI.XFrame).create(parent, layout, visibility);
-
-			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H) && !m_scroll_bar_h) {
-				m_scroll_bar_h = new UI.XScrollBar();
-				m_scroll_bar_h.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_H,
-					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_h, fg_h);
-				m_scroll_bar_h.addNotificationListener(me.$THIS);
-			}
-
-			if ((m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V) && !m_scroll_bar_v) {
-				m_scroll_bar_v = new UI.XScrollBar();
-				m_scroll_bar_v.create(me.$THIS, UI.XScrollBar.ScrollType.SCROLL_V,
-					me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW, bg_v, fg_v);
-				m_scroll_bar_v.addNotificationListener(me.$THIS);
-			}
-
-			if (!m_view) {
-				m_view = new UI.XScrollView();
-				m_view.create(me.$THIS, me.generateLayoutParam(), SELF.Visibility.VISIBILITY_SHOW);
-				m_view.addNotificationListener(me.$THIS);
-			}
-		});
-
-		$PUBLIC_FUN_IMPL('destroy', function(){
-			m_view = m_scroll_bar_h = m_scroll_bar_v = null;
-			me.$PARENT(UI.XFrame).destroy();
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureWidth', function(param){
-			var measured = 0;
-			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-				measured = param.num;
-
-			var param_for_measure = new SELF.MeasureParam();
-			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-
-			if (m_view) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_v_width);
-				m_view.measureWidth(param_for_measure);
-			}
-
-			if (m_scroll_bar_v) {
-				param_for_measure.num = m_scroll_v_width;
-				m_scroll_bar_v.measureWidth(param_for_measure);
-			}
-
-			if (m_scroll_bar_h) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_V)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_v_width);
-				m_scroll_bar_h.measureWidth(param_for_measure);
-			}
-
-			me.setMeasuredWidth(measured);
-
-		});
-
-		$PUBLIC_FUN_IMPL('onMeasureHeight', function(param){
-			var measured = 0;
-			if (param.spec == SELF.MeasureParam.Spec.MEASURE_EXACT)
-				measured = param.num;
-
-			var param_for_measure = new SELF.MeasureParam();
-			param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-
-			if (m_view) {
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_h_height);
-				m_view.measureHeight(param_for_measure);
-			}
-
-			if (m_scroll_bar_v) {
-
-				param_for_measure.num = measured;
-				if (m_scroll_bar & SELF.ScrollBar.SCROLL_BAR_H)
-					param_for_measure.num = Math.max(0, 
-						param_for_measure.num - m_scroll_h_height);
-				m_scroll_bar_v.measureHeight(param_for_measure);
-			}
-
-			if (m_scroll_bar_h) {
-				param_for_measure.num = m_scroll_h_height;
-				m_scroll_bar_h.measureHeight(param_for_measure);
-			}
-
-			me.setMeasuredHeight(measured);
-		});
-
-		$PUBLIC_FUN_IMPL('onLayout', function(rc){
-
-			var width = rc.width();
-			var height = rc.height();
-
-			if (m_view)
-				m_view.layout(new UI.Rect(0, 0, 
-					m_view.getMeasuredWidth(), m_view.getMeasuredHeight()));
-			if (m_scroll_bar_v)
-				m_scroll_bar_v.layout(new UI.Rect(
-					width - m_scroll_bar_v.getMeasuredWidth(), 0,
-					width, m_scroll_bar_v.getMeasuredHeight()));
-			if (m_scroll_bar_h)
-				m_scroll_bar_h.layout(new UI.Rect(
-					0, height - m_scroll_bar_h.getMeasuredHeight(),
-					m_scroll_bar_h.getMeasuredWidth(), height));
-
-		});
-
-		$PUBLIC_FUN_IMPL('addContentFrame', function(frame){
-			m_view.addFrame(frame);
-		});
-
-		$PUBLIC_FUN_IMPL('getContentFrameCount', function(){
-			return m_view.getFrameCount();
-		});
-
-		$PUBLIC_FUN_IMPL('removeContentFrame', function(index){
-			return m_view.removeFrame(index);
-		});
-
-		$PUBLIC_FUN_IMPL('handleXMLChildNode', function(xml_node) {
-			for (var i = 0; i < xml_node.childNodes.length; i++) {
-				var c = xml_node.childNodes[i];
-				// node element. 
-				if (c.nodeType != 1) continue; 
-				UI.XFrameXMLFactory.instance().buildFrame(c, m_view);
-			}
-		});
-
-		$MESSAGE_HANDLER('onViewRectChanged', function(n){
-			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
-				n.old.width(), n.old.height());
-		});
-
-		$MESSAGE_HANDLER('onContentRectChanged', function(n){
-			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
-				n.old.max_x, n.old.max_y);
-		});
-
-		$MESSAGE_HANDLER('onScrollChanged', function(n){
-			if (n.src == m_scroll_bar_h) {
-				m_view.setScrollX(n.pos);
-			}
-
-			if (n.src == m_scroll_bar_v) {
-				m_view.setScrollY(n.pos);
-			}
-
-		});
-
-		$MESSAGE_HANDLER('onMouseUp', function(e){
-			if (m_scroll_bar_v && 
-				m_scroll_bar_v.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
-				m_scroll_bar_v.getFocus();
-			else if (m_scroll_bar_h && 
-				m_scroll_bar_h.getVisibility() == SELF.Visibility.VISIBILITY_SHOW)
-				m_scroll_bar_h.getFocus();
-		});
-
-		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
-			if (m_scroll_bar_v && old_h != h)
-				m_scroll_bar_v[fn](h);
-			if (m_scroll_bar_h && old_w != w)
-				m_scroll_bar_h[fn](w);
-		}
-
-	
-	})
-	.$STATIC({
-		'buildFromXML' : buildFromXML,
-	});
-
-	$ENUM('UI.XScrollFrame.ScrollBar', {
-		'SCROLL_BAR_H' : 1,
-		'SCROLL_BAR_V' : 2,
-	});
-
-	function buildFromXML(xml_node, parent) {
-
-		var layout_param = parent ?
-			parent.generateLayoutParam(xml_node) :
-			new UI.XFrame.LayoutParam(xml_node);
-
-		var scroll_bar = 0;
-		var bar_bg_h = null;
-		var bar_fg_h = null;
-		var bar_bg_v = null;
-		var bar_fg_v = null;
-
-		if ((xml_node.getAttribute('h_scroll') || '').toLowerCase() == 'true')
-			scroll_bar |= this.ScrollBar.SCROLL_BAR_H;
-		if ((xml_node.getAttribute('v_scroll') || '').toLowerCase() == 'true')
-			scroll_bar |= this.ScrollBar.SCROLL_BAR_V;
-
-		if (!scroll_bar) {
-			UI.XFrameXMLFactory
-				.reportError('WARNING: No scroll bar specified for the scroll frame. Create the scroll frame failed. ');
-			return null;
-		}
-
-		if (scroll_bar & this.ScrollBar.SCROLL_BAR_H) {
-			bar_bg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_bg", null, "3partH", "scroll_bar_h_bg_part_");
-			bar_fg_h = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_h_face_fg", null, "3partH", "scroll_bar_h_fg_part_");
-		}
-		if (scroll_bar & this.ScrollBar.SCROLL_BAR_V) {
-			bar_bg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_bg", null, "3partV", "scroll_bar_v_bg_part_");
-			bar_fg_v = UI.XFrameXMLFactory.buildImage(xml_node, "scroll_bar_v_face_fg", null, "3partV", "scroll_bar_v_fg_part_");
-		}
-
-		var frame = new this(scroll_bar);
-		frame.create(parent, layout_param, 
-			UI.XFrame.Visibility.VISIBILITY_NONE,
-			bar_bg_h, bar_fg_h, bar_bg_v, bar_fg_v);
-
-		return frame;
-
-	}
-
-
-
-})();
