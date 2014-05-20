@@ -10373,6 +10373,12 @@ Math.realFloor = function(num) {
         n = -n;
     return n;
 }
+
+if (!Number.isFinite) {
+    Number.isFinite = function(n) {
+        return n != Number.NEGATIVE_INFINITY && n != Number.POSITIVE_INFINITY;
+    }
+}
 ;
 
 
