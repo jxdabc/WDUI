@@ -23,8 +23,8 @@ function(me, SELF){
 	var m_alpha = 255;
 	var m_dst_rect = new UI.Rect();
 	var m_text = '';
-	var m_face = 'Verdana, Arial, 微软雅黑, 宋体';
-	var m_size = 13;
+	var m_face = 'Arial, \'Microsoft YaHei\'';
+	var m_size = 14;
 	var m_style = SELF.Style.STYLE_NORMAL;
 	var m_color = '#000';
 	var m_halign = SELF.Align.ALIGN_START;

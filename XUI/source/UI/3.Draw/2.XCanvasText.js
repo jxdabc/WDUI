@@ -19,8 +19,8 @@ $CLASS('UI.XCanvasText', function(me, SELF){
 
 	var m_line_height_mutiplier = 1.2;
 
-	var m_font_face = 'Verdana, Arial, 微软雅黑, 宋体';
-	var m_font_size = 13;
+	var m_font_face = 'Arial, \'Microsoft YaHei\'';
+	var m_font_size = 14;
 	var m_font_color = '#000';
 
 	var m_bold = false;

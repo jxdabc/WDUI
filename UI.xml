@@ -8,9 +8,17 @@
     <XButton name="sys_min" face="@img/ctrl/sysbtn_min.png" width="wrap_content" height="wrap_content"></XButton>
   </XDock>
   <XDock dock_type="right2left" align_type="middle" left="0" top="30" width="reach_parent" height="15">
-    <XSysControl type="edit" width="200" height="15" margin_right="20"></XSysControl>
+    <XSysControl type="edit" width="200" height="15" margin_right="20">
+      <![CDATA[
+        <input type="text" style="display:block; width:100%; height:100%; border:0; margin:0; padding:0"/>
+      ]]>
+    </XSysControl>
   </XDock>
-  <XSysControl type="edit" left="200" top="50" width="reach_parent" height="15" margin_right="20"></XSysControl>
+  <XSysControl type="edit" left="200" top="50" width="reach_parent" height="15" margin_right="20">
+    <![CDATA[
+      <input type="text" style="display:block; width:100%; height:100%; border:0; margin:0; padding:0"/>
+    ]]>
+  </XSysControl>
   <XButton name="dialog_button" left="10" top="40" width="80" height="23">
     <XStatic width="80" height="23" top="0" text_align_v="middle" text_align_h="center" font_style="bold" font="Times New Roman" text="DIALOG"></XStatic>
   </XButton>
