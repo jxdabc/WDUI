@@ -147,11 +147,9 @@
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				var layout_rect = new UI.Rect();
 				var start = layout_rect[layout_direction_start] = 
@@ -196,11 +194,9 @@
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] ==
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -247,11 +243,9 @@
 
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] !=
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -280,11 +274,10 @@
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
+				if (!cur.needLayout())
+					continue;
 				var layout_param = cur.getLayoutParam();
 
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
-					continue;
 
 				var param_for_measure = new SELF.MeasureParam();
 

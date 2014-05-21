@@ -11572,6 +11572,7 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 			'isLayouting',
 			'invalidateLayout',
 
+			'needLayout',
 			'measureWidth',
 			'measureHeight',
 			'getMeasuredWidth',
@@ -11766,14 +11767,48 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 
 			// overload beginUpdateLayoutParam()
 
+			if (typeof layout_param != 'undefined' && !layout_param)
+				throw new Exception('XUIClass::NLP', 
+					'UI.XFrame::beginUpdateLayoutParam: called with null layout_param. ');
+
+			if (typeof layout_param == 'undefined' && !m_layout_param)
+				throw new Exception('XUIClass::LPNI', 
+					'UI.XFrame::beginUpdateLayoutParam: layout parameter not initialized. ');
+
 			if (me.isLayouting()) {
-				if (!m_delay_layout_param)
-					m_delay_layout_param = layout_param || me.generateLayoutParam(m_layout_param);
-				return m_delay_layout_param;
+				if (typeof layout_param == 'undefined') {
+					if (m_delay_layout_param)
+						return m_delay_layout_param;
+					if (m_parent)
+						m_delay_layout_param = 
+							m_parent.generateLayoutParam(m_layout_param);
+					else
+						m_delay_layout_param = 
+							new UI.XFrame.LayoutParam(m_layout_param);
+					return m_delay_layout_param;
+				} else {
+					if (m_delay_layout_param != layout_param)
+						m_delay_layout_param = layout_param;
+				}
+
 			} else {
-				if (!m_layout_param)
-					m_layout_param = layout_param || me.generateLayoutParam();
-				return m_layout_param;
+
+				if (typeof layout_param == 'undefined') {
+					if (m_delay_layout_param) {
+						if (m_delay_layout_param != m_layout_param)
+							m_layout_param = m_delay_layout_param;
+						m_delay_layout_param = null;
+					}
+					return m_layout_param;
+				} else {
+					if (m_delay_layout_param == m_layout_param)
+						m_delay_layout_param = null;
+
+					m_delay_layout_param = null;
+
+					if (m_layout_param != layout_param)
+						m_layout_param = layout_param;
+				}
 			}
 		});
 
@@ -12404,6 +12439,10 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 			if (m_parent) m_parent.setCursor(cursor);
 		});
 
+		$PUBLIC_FUN_IMPL('needLayout', function(){
+			return m_visibility != SELF.Visibility.VISIBILITY_NONE;
+		});
+
 		$PUBLIC_FUN_IMPL('measureWidth', function(param){
 			if (param.equals(m_last_measure_width_param) && !m_layout_invalid)
 				return;
@@ -12471,10 +12510,9 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 		$PUBLIC_FUN_IMPL('onLayout', function(rc) {
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				var rect = new UI.Rect(layout_param.x, layout_param.y,
 					layout_param.x + cur.getMeasuredWidth(),
@@ -12485,12 +12523,16 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 		});
 
 		$MESSAGE_HANDLER('onDelayupdateLayout', function(){
-			if (!m_delay_update_layout_param_scheduled || !m_delay_layout_param)
+			if (!m_delay_update_layout_param_scheduled)
 				return;
 
 			m_delay_update_layout_param_scheduled = false;
 
-			m_layout_param = m_delay_layout_param;
+			if (!m_delay_layout_param) return;
+
+			if (m_layout_param != m_delay_layout_param)
+				m_layout_param = m_delay_layout_param;
+
 			m_delay_layout_param = null;
 
 			me.endUpdateLayoutParam();
@@ -12554,9 +12596,9 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam(); 
-				if (cur.getVisibility == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam(); 
 
 				if (layout_param[layout_param_size] == 
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -12602,10 +12644,9 @@ $ENUM('UI.XTextService.NOTIFICATION', [
 
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] != 
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -15484,11 +15525,9 @@ $CLASS('UI.XCanvasImage', function(me){
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				var layout_rect = new UI.Rect();
 				var start = layout_rect[layout_direction_start] = 
@@ -15533,11 +15572,9 @@ $CLASS('UI.XCanvasImage', function(me){
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] ==
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -15584,11 +15621,9 @@ $CLASS('UI.XCanvasImage', function(me){
 
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] !=
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -15617,11 +15652,10 @@ $CLASS('UI.XCanvasImage', function(me){
 			var frame_count = me.getFrameCount();
 			for (var i = 0; i < frame_count; i++) {
 				var cur = me.getFrameByIndex(i);
+				if (!cur.needLayout())
+					continue;
 				var layout_param = cur.getLayoutParam();
 
-				if (cur.getVisibility() == 
-					SELF.Visibility.VISIBILITY_NONE)
-					continue;
 
 				var param_for_measure = new SELF.MeasureParam();
 
@@ -16239,10 +16273,9 @@ function(me, SELF) {
 		var frame_count = me.getFrameCount();
 		for (var i = 0; i < frame_count; i++) {
 			var cur = me.getFrameByIndex(i);
-			var layout_param = cur.getLayoutParam();
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
+			if (!cur.needLayout())
 				continue;
+			var layout_param = cur.getLayoutParam();
 
 			var rect = new UI.Rect(layout_param.x, layout_param.y,
 				layout_param.x + cur.getMeasuredWidth(),
@@ -16273,11 +16306,10 @@ function(me, SELF) {
 		for (var i = 0; i < frame_count; i++) {
 			var cur = me.getFrameByIndex(i);
 
-			var layout_param = cur.getLayoutParam();
-
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
+			if (!cur.needLayout())
 				continue;
+
+			var layout_param = cur.getLayoutParam();
 
 			var param_for_measure = new SELF.MeasureParam();
 
@@ -16288,7 +16320,7 @@ function(me, SELF) {
 					break;
 				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
 					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = max(0, 
+					param_for_measure.num = Math.max(0, 
 						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
 					break;
 				default:
@@ -17834,13 +17866,13 @@ $ENUM('UI.XScrollBar.NOTIFICATION',
 
 		$MESSAGE_HANDLER('onViewRectChanged', function(n){
 			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
+			onViewOrContentChanged('setViewLen', n.new.width(), n.new.height(),
 				n.old.width(), n.old.height());
 		});
 
 		$MESSAGE_HANDLER('onContentRectChanged', function(n){
 			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
+			onViewOrContentChanged('setContentLen', n.new.max_x, n.new.max_y,
 				n.old.max_x, n.old.max_y);
 		});
 
@@ -17864,7 +17896,7 @@ $ENUM('UI.XScrollBar.NOTIFICATION',
 				m_scroll_bar_h.getFocus();
 		});
 
-		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
+		function onViewOrContentChanged(fn, w, h, old_w, old_h) {
 			if (m_scroll_bar_v && old_h != h)
 				m_scroll_bar_v[fn](h);
 			if (m_scroll_bar_h && old_w != w)

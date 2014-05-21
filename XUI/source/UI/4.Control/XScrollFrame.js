@@ -189,13 +189,13 @@
 
 		$MESSAGE_HANDLER('onViewRectChanged', function(n){
 			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setViewLen', n.new.width(), n.new.height(),
+			onViewOrContentChanged('setViewLen', n.new.width(), n.new.height(),
 				n.old.width(), n.old.height());
 		});
 
 		$MESSAGE_HANDLER('onContentRectChanged', function(n){
 			if (n.src != m_view) return;
-			onViewOrContentRectChanged('setContentLen', n.new.max_x, n.new.max_y,
+			onViewOrContentChanged('setContentLen', n.new.max_x, n.new.max_y,
 				n.old.max_x, n.old.max_y);
 		});
 
@@ -219,7 +219,7 @@
 				m_scroll_bar_h.getFocus();
 		});
 
-		function onViewOrContentRectChanged(fn, w, h, old_w, old_h) {
+		function onViewOrContentChanged(fn, w, h, old_w, old_h) {
 			if (m_scroll_bar_v && old_h != h)
 				m_scroll_bar_v[fn](h);
 			if (m_scroll_bar_h && old_w != w)

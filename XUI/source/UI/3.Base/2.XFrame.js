@@ -55,6 +55,7 @@
 			'isLayouting',
 			'invalidateLayout',
 
+			'needLayout',
 			'measureWidth',
 			'measureHeight',
 			'getMeasuredWidth',
@@ -249,14 +250,48 @@
 
 			// overload beginUpdateLayoutParam()
 
+			if (typeof layout_param != 'undefined' && !layout_param)
+				throw new Exception('XUIClass::NLP', 
+					'UI.XFrame::beginUpdateLayoutParam: called with null layout_param. ');
+
+			if (typeof layout_param == 'undefined' && !m_layout_param)
+				throw new Exception('XUIClass::LPNI', 
+					'UI.XFrame::beginUpdateLayoutParam: layout parameter not initialized. ');
+
 			if (me.isLayouting()) {
-				if (!m_delay_layout_param)
-					m_delay_layout_param = layout_param || me.generateLayoutParam(m_layout_param);
-				return m_delay_layout_param;
+				if (typeof layout_param == 'undefined') {
+					if (m_delay_layout_param)
+						return m_delay_layout_param;
+					if (m_parent)
+						m_delay_layout_param = 
+							m_parent.generateLayoutParam(m_layout_param);
+					else
+						m_delay_layout_param = 
+							new UI.XFrame.LayoutParam(m_layout_param);
+					return m_delay_layout_param;
+				} else {
+					if (m_delay_layout_param != layout_param)
+						m_delay_layout_param = layout_param;
+				}
+
 			} else {
-				if (!m_layout_param)
-					m_layout_param = layout_param || me.generateLayoutParam();
-				return m_layout_param;
+
+				if (typeof layout_param == 'undefined') {
+					if (m_delay_layout_param) {
+						if (m_delay_layout_param != m_layout_param)
+							m_layout_param = m_delay_layout_param;
+						m_delay_layout_param = null;
+					}
+					return m_layout_param;
+				} else {
+					if (m_delay_layout_param == m_layout_param)
+						m_delay_layout_param = null;
+
+					m_delay_layout_param = null;
+
+					if (m_layout_param != layout_param)
+						m_layout_param = layout_param;
+				}
 			}
 		});
 
@@ -887,6 +922,10 @@
 			if (m_parent) m_parent.setCursor(cursor);
 		});
 
+		$PUBLIC_FUN_IMPL('needLayout', function(){
+			return m_visibility != SELF.Visibility.VISIBILITY_NONE;
+		});
+
 		$PUBLIC_FUN_IMPL('measureWidth', function(param){
 			if (param.equals(m_last_measure_width_param) && !m_layout_invalid)
 				return;
@@ -954,10 +993,9 @@
 		$PUBLIC_FUN_IMPL('onLayout', function(rc) {
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				var rect = new UI.Rect(layout_param.x, layout_param.y,
 					layout_param.x + cur.getMeasuredWidth(),
@@ -968,12 +1006,16 @@
 		});
 
 		$MESSAGE_HANDLER('onDelayupdateLayout', function(){
-			if (!m_delay_update_layout_param_scheduled || !m_delay_layout_param)
+			if (!m_delay_update_layout_param_scheduled)
 				return;
 
 			m_delay_update_layout_param_scheduled = false;
 
-			m_layout_param = m_delay_layout_param;
+			if (!m_delay_layout_param) return;
+
+			if (m_layout_param != m_delay_layout_param)
+				m_layout_param = m_delay_layout_param;
+
 			m_delay_layout_param = null;
 
 			me.endUpdateLayoutParam();
@@ -1037,9 +1079,9 @@
 
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam(); 
-				if (cur.getVisibility == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam(); 
 
 				if (layout_param[layout_param_size] == 
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)
@@ -1085,10 +1127,9 @@
 
 			for (var i = 0; i < m_child_frames.length; i++) {
 				var cur = m_child_frames[i];
-				var layout_param = cur.getLayoutParam();
-
-				if (cur.getVisibility() == SELF.Visibility.VISIBILITY_NONE)
+				if (!cur.needLayout())
 					continue;
+				var layout_param = cur.getLayoutParam();
 
 				if (layout_param[layout_param_size] != 
 					SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT)

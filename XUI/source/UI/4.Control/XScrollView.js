@@ -37,10 +37,9 @@ function(me, SELF) {
 		var frame_count = me.getFrameCount();
 		for (var i = 0; i < frame_count; i++) {
 			var cur = me.getFrameByIndex(i);
-			var layout_param = cur.getLayoutParam();
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
+			if (!cur.needLayout())
 				continue;
+			var layout_param = cur.getLayoutParam();
 
 			var rect = new UI.Rect(layout_param.x, layout_param.y,
 				layout_param.x + cur.getMeasuredWidth(),
@@ -71,11 +70,10 @@ function(me, SELF) {
 		for (var i = 0; i < frame_count; i++) {
 			var cur = me.getFrameByIndex(i);
 
-			var layout_param = cur.getLayoutParam();
-
-			if (cur.getVisibility() == 
-				SELF.Visibility.VISIBILITY_NONE)
+			if (!cur.needLayout())
 				continue;
+
+			var layout_param = cur.getLayoutParam();
 
 			var param_for_measure = new SELF.MeasureParam();
 
@@ -86,7 +84,7 @@ function(me, SELF) {
 					break;
 				case SELF.LayoutParam.SpecialMetrics.METRIC_REACH_PARENT:
 					param_for_measure.spec = SELF.MeasureParam.Spec.MEASURE_EXACT;
-					param_for_measure.num = max(0, 
+					param_for_measure.num = Math.max(0, 
 						measured - layout_param[layout_param_pos] - layout_param[layout_margin_end]);
 					break;
 				default:
