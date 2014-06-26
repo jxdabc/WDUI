@@ -11,12 +11,12 @@ function Exception(err, des) {
 
 String.prototype.format = function()
 {
-    var args = arguments;
-    var count = 0;
-    return this.replace(/%/g,                
-        function(){
-            return args[count++];
-        });
+	var args = arguments;
+	var count = 0;
+	return this.replace(/%/g,				
+		function(){
+			return args[count++];
+		});
 }
 
 String.prototype.upperFirst = function()
@@ -26,14 +26,14 @@ String.prototype.upperFirst = function()
 }
 
 Math.realFloor = function(num) {
-    var n = Math.floor(Math.abs(num));
-    if (num < 0)
-        n = -n;
-    return n;
+	var n = Math.floor(Math.abs(num));
+	if (num < 0)
+		n = -n;
+	return n;
 }
 
 if (!Number.isFinite) {
-    Number.isFinite = function(n) {
-        return n != Number.NEGATIVE_INFINITY && n != Number.POSITIVE_INFINITY;
-    }
+	Number.isFinite = function(n) {
+		return n != Number.NEGATIVE_INFINITY && n != Number.POSITIVE_INFINITY;
+	}
 }

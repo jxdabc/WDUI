@@ -244,6 +244,8 @@ function(me, SELF) {
 
 	function updateSysControlPosition() {
 
+		if (!m_$container) return;
+
 		var rc = me.getRect();
 		rc = me.toContainer(me.parentToChild(rc));
 
